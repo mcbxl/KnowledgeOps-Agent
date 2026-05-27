@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
+from uuid import uuid4
 
 from sqlalchemy import (
     Column,
@@ -15,6 +16,7 @@ from sqlalchemy import (
     create_engine,
     func,
     select,
+    update,
 )
 from sqlalchemy.engine import Engine, RowMapping
 
@@ -48,6 +50,20 @@ chunks_table = Table(
     Column("page", Integer),
     Column("tags", Text, nullable=False),
     Column("embedding", Text, nullable=False),
+)
+
+tasks_table = Table(
+    "tasks",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("task_type", String(80), nullable=False, index=True),
+    Column("status", String(32), nullable=False, index=True),
+    Column("title", String(240), nullable=False),
+    Column("payload", Text, nullable=False),
+    Column("result", Text),
+    Column("error", Text),
+    Column("created_at", String(64), nullable=False),
+    Column("updated_at", String(64), nullable=False),
 )
 
 
@@ -141,6 +157,53 @@ class KnowledgeStore:
         with self.engine.connect() as conn:
             return int(conn.execute(statement).scalar_one())
 
+    def create_task(self, task_type: str, title: str, payload: dict | None = None) -> dict:
+        now = datetime.now(timezone.utc).isoformat()
+        task = {
+            "id": str(uuid4()),
+            "task_type": task_type,
+            "status": "queued",
+            "title": title,
+            "payload": json.dumps(payload or {}, ensure_ascii=False),
+            "result": None,
+            "error": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+        with self.engine.begin() as conn:
+            conn.execute(tasks_table.insert().values(**task))
+        return self._row_to_task(task)
+
+    def update_task(
+        self,
+        task_id: str,
+        status: str,
+        result: dict | None = None,
+        error: str | None = None,
+    ) -> dict | None:
+        values = {
+            "status": status,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "result": json.dumps(result, ensure_ascii=False) if result is not None else None,
+            "error": error,
+        }
+        statement = update(tasks_table).where(tasks_table.c.id == task_id).values(**values)
+        with self.engine.begin() as conn:
+            conn.execute(statement)
+        return self.get_task(task_id)
+
+    def get_task(self, task_id: str) -> dict | None:
+        statement = select(tasks_table).where(tasks_table.c.id == task_id).limit(1)
+        with self.engine.connect() as conn:
+            row = conn.execute(statement).mappings().first()
+        return self._row_to_task(row) if row else None
+
+    def list_tasks(self, limit: int = 30) -> list[dict]:
+        statement = select(tasks_table).order_by(tasks_table.c.created_at.desc()).limit(limit)
+        with self.engine.connect() as conn:
+            rows = conn.execute(statement).mappings().all()
+        return [self._row_to_task(row) for row in rows]
+
     def _row_to_document(self, row: RowMapping) -> Document:
         return Document(
             id=row["id"],
@@ -165,3 +228,16 @@ class KnowledgeStore:
             tags=json.loads(row["tags"]),
             embedding=json.loads(row["embedding"]),
         )
+
+    def _row_to_task(self, row) -> dict:
+        return {
+            "id": row["id"],
+            "task_type": row["task_type"],
+            "status": row["status"],
+            "title": row["title"],
+            "payload": json.loads(row["payload"] or "{}"),
+            "result": json.loads(row["result"]) if row["result"] else None,
+            "error": row["error"],
+            "created_at": datetime.fromisoformat(row["created_at"]),
+            "updated_at": datetime.fromisoformat(row["updated_at"]),
+        }

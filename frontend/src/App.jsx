@@ -8,6 +8,7 @@ import {
   FilePlus2,
   Gauge,
   GitBranch,
+  ListChecks,
   Loader2,
   MessageSquareText,
   Search,
@@ -21,6 +22,8 @@ import {
   getOpsReport,
   ingestText,
   ingestUrl,
+  createOpsReportTask,
+  listTasks,
   listDocuments,
   runAgent,
   search,
@@ -34,6 +37,7 @@ const tabs = [
   { id: 'ops', label: 'Ops', icon: Sparkles },
   { id: 'agent', label: 'Agent', icon: ClipboardCheck },
   { id: 'eval', label: 'Eval', icon: Gauge },
+  { id: 'tasks', label: 'Tasks', icon: ListChecks },
   { id: 'graph', label: 'Graph', icon: GitBranch },
 ]
 
@@ -121,6 +125,7 @@ export default function App() {
         {activeTab === 'ops' && <OpsPanel report={report} refresh={refresh} />}
         {activeTab === 'agent' && <AgentPanel />}
         {activeTab === 'eval' && <EvalPanel />}
+        {activeTab === 'tasks' && <TasksPanel />}
         {activeTab === 'graph' && <GraphPanel report={report} />}
       </main>
     </div>
@@ -509,6 +514,86 @@ function EvalPanel() {
           </>
         ) : (
           <p className="empty">Run benchmark queries to inspect retrieval quality.</p>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function TasksPanel() {
+  const [tasks, setTasks] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [status, setStatus] = useState('')
+
+  async function refresh() {
+    setLoading(true)
+    try {
+      setTasks(await listTasks())
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function createTask() {
+    setLoading(true)
+    setStatus('')
+    try {
+      const task = await createOpsReportTask()
+      setStatus(`Created task ${task.id.slice(0, 8)}.`)
+      setTasks(await listTasks())
+    } catch (error) {
+      setStatus(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    refresh().catch((error) => setStatus(error.message))
+  }, [])
+
+  return (
+    <section className="stack">
+      <div className="panel taskToolbar">
+        <div className="panelHeader">
+          <ListChecks size={18} />
+          <h2>Operations Tasks</h2>
+        </div>
+        <div className="taskActions">
+          <button className="primary" onClick={createTask} type="button">
+            {loading ? <Loader2 className="spin" size={17} /> : <Sparkles size={17} />}
+            Generate Ops Report
+          </button>
+          <button className="secondary" onClick={refresh} type="button">
+            Refresh
+          </button>
+        </div>
+        {status && <p className="taskStatus">{status}</p>}
+      </div>
+      <div className="panel">
+        {tasks.length === 0 ? (
+          <p className="empty">No tasks yet.</p>
+        ) : (
+          <div className="taskList">
+            {tasks.map((task) => (
+              <article className={`taskRow ${task.status}`} key={task.id}>
+                <div>
+                  <strong>{task.title}</strong>
+                  <span>{task.task_type} · {task.status}</span>
+                </div>
+                <small>{new Date(task.updated_at).toLocaleString()}</small>
+                {task.result && (
+                  <footer>
+                    <span>{task.result.document_count} docs</span>
+                    <span>{task.result.chunk_count} chunks</span>
+                    <span>{task.result.issue_count} issues</span>
+                    <span>{Math.round(task.result.quality_score * 100)}% quality</span>
+                  </footer>
+                )}
+                {task.error && <p>{task.error}</p>}
+              </article>
+            ))}
+          </div>
         )}
       </div>
     </section>

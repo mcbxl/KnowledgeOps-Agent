@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from app.core.config import get_settings
 from app.schemas.api import (
     AgentRunRequest,
@@ -17,6 +17,7 @@ from app.schemas.api import (
     RetrievalEvalResponse,
     SearchHit,
     SearchRequest,
+    TaskResponse,
 )
 from app.services.agent import KnowledgeOpsAgent
 from app.services.chunking import HierarchicalChunker
@@ -27,6 +28,7 @@ from app.services.ops import KnowledgeOpsService
 from app.services.qa import AnswerAgent
 from app.services.retrieval import HybridRetrievalService, hit_snippet
 from app.services.storage import KnowledgeStore
+from app.services.tasks import TaskService
 from app.services.text_utils import normalize_space, tokenize
 
 router = APIRouter(prefix="/api")
@@ -169,6 +171,30 @@ def evaluate_retrieval(
     retrieval: HybridRetrievalService = Depends(get_retrieval),
 ):
     return RetrievalEvaluationService(store, retrieval).evaluate(payload.queries, payload.limit)
+
+
+@router.post("/tasks/ops-report", response_model=TaskResponse)
+def create_ops_report_task(
+    background_tasks: BackgroundTasks,
+    store: KnowledgeStore = Depends(get_store),
+):
+    service = TaskService(store)
+    task = service.create_ops_report_task()
+    background_tasks.add_task(service.run_ops_report_task, task["id"])
+    return TaskResponse(**task)
+
+
+@router.get("/tasks", response_model=list[TaskResponse])
+def list_tasks(limit: int = 30, store: KnowledgeStore = Depends(get_store)):
+    return [TaskResponse(**task) for task in store.list_tasks(limit)]
+
+
+@router.get("/tasks/{task_id}", response_model=TaskResponse)
+def get_task(task_id: str, store: KnowledgeStore = Depends(get_store)):
+    task = store.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    return TaskResponse(**task)
 
 
 def _document_response(doc, store: KnowledgeStore) -> DocumentResponse:

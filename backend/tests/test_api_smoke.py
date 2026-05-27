@@ -66,5 +66,13 @@ def test_ingest_search_ask_agent_and_eval(tmp_path):
         )
         assert evaluation.status_code == 200
         assert evaluation.json()["cases"][0]["hit_count"] >= 1
+
+        task = client.post("/api/tasks/ops-report")
+        assert task.status_code == 200
+        assert task.json()["status"] in {"queued", "completed"}
+
+        tasks = client.get("/api/tasks")
+        assert tasks.status_code == 200
+        assert len(tasks.json()) >= 1
     finally:
         app.dependency_overrides.clear()

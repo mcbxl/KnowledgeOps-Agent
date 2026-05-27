@@ -15,6 +15,7 @@ KnowledgeOps Agent 面向个人或团队知识库，核心目标不是简单 RAG
   ├─ 运营报告
   ├─ Agent 工作流
   ├─ 检索评估
+  ├─ 运营任务中心
   └─ 知识图谱
 
 后端服务
@@ -24,7 +25,8 @@ KnowledgeOps Agent 面向个人或团队知识库，核心目标不是简单 RAG
   ├─ Hybrid Retrieval Service
   ├─ Answer Agent
   ├─ LangGraph KnowledgeOps Agent
-  └─ Retrieval Evaluation Service
+  ├─ Retrieval Evaluation Service
+  └─ Task Service
 
 存储层
   ├─ MySQL：文档、chunk、标签、摘要、引用、报告元数据
@@ -38,6 +40,7 @@ KnowledgeOps Agent 面向个人或团队知识库，核心目标不是简单 RAG
 
 - `documents`：文档标题、正文、来源类型、来源 URI、标签、摘要、内容哈希、创建时间。
 - `chunks`：chunk 正文、章节路径、顺序、页码、标签、embedding JSON。
+- `tasks`：运营任务类型、状态、输入参数、执行结果、错误信息和更新时间。
 
 本地测试仍可注入 SQLite URL，以保证没有 MySQL 服务时也能跑单元测试；生产运行默认使用 `KNOWLEDGEOPS_DATABASE_URL` 指向 MySQL。
 
@@ -122,3 +125,14 @@ Topic Coverage 用文档标签和 chunk 标签统计主题覆盖：
 - `mentions`：章节提到某个主题。
 
 生产版本可以继续加入实体节点、概念节点、引用关系和冲突关系。
+
+## 任务中心设计
+
+当前版本提供轻量任务中心，用 MySQL `tasks` 表记录任务状态：
+
+- `queued`
+- `running`
+- `completed`
+- `failed`
+
+`POST /api/tasks/ops-report` 会创建 KnowledgeOps 报告任务，并通过 FastAPI `BackgroundTasks` 在后台执行。该设计是 Celery/RQ 的前置抽象，后续可以将执行器替换为 Redis 队列，而不改变前端和 API 协议。

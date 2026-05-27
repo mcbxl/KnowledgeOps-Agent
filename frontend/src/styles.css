@@ -58,7 +58,8 @@ textarea {
 }
 
 .nav button,
-.primary {
+.primary,
+.secondary {
   border: 0;
   cursor: pointer;
   display: inline-flex;
@@ -199,6 +200,12 @@ textarea {
 .primary {
   background: #166f8f;
   color: #ffffff;
+  padding: 0 14px;
+}
+
+.secondary {
+  background: #edf2f7;
+  color: #253244;
   padding: 0 14px;
 }
 
@@ -476,7 +483,7 @@ button.documentRow.selected {
   }
 
   .nav {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(8, minmax(0, 1fr));
   }
 
   .nav button {
@@ -553,4 +560,66 @@ button.documentRow.selected {
 .evalMetrics {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-bottom: 10px;
+}
+
+.taskToolbar {
+  display: grid;
+  gap: 12px;
+}
+
+.taskActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.taskStatus {
+  color: #15566c;
+}
+
+.taskList {
+  display: grid;
+  gap: 10px;
+}
+
+.taskRow {
+  border: 1px solid #e0e5ea;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.taskRow.completed {
+  border-left: 3px solid #168466;
+}
+
+.taskRow.running,
+.taskRow.queued {
+  border-left: 3px solid #166f8f;
+}
+
+.taskRow.failed {
+  border-left: 3px solid #b42318;
+}
+
+.taskRow div,
+.taskRow footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.taskRow span,
+.taskRow small,
+.taskRow footer span {
+  color: #617082;
+}
+
+.taskRow footer span {
+  background: #f0f3f6;
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 4px 9px;
 }

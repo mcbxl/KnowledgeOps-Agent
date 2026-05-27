@@ -157,3 +157,15 @@ class RetrievalEvalResponse(BaseModel):
     average_top_score: float
     citation_ready_rate: float
     cases: list[RetrievalEvalCase]
+
+
+class TaskResponse(BaseModel):
+    id: str
+    task_type: str
+    status: Literal["queued", "running", "completed", "failed"]
+    title: str
+    payload: dict
+    result: dict | None = None
+    error: str | None = None
+    created_at: datetime
+    updated_at: datetime

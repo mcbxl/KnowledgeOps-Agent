@@ -15,6 +15,7 @@ KnowledgeOps Agent 是一个面向个人/团队知识库的智能运营系统。
 - **证据化运营报告**：对重复、低质量、冲突候选问题输出置信度、证据片段和建议动作。
 - **Topic Coverage**：识别薄弱主题、健康主题和高密度主题，用于知识补全和学习路线生成。
 - **检索评估台**：输入 benchmark queries，评估 TopK 命中、Top1 分数和引用元数据完整性。
+- **运营任务中心**：支持触发 KnowledgeOps 报告任务并查看任务状态，为后续接入 Celery/RQ 预留边界。
 - **知识图谱**：展示 document、section、topic 三类节点及其关系。
 
 ## 技术栈
@@ -106,6 +107,9 @@ http://127.0.0.1:8000/api/health
 - `GET /api/ops/report`：生成知识库运营报告
 - `POST /api/agent/run`：运行 LangGraph KnowledgeOps Agent 工作流
 - `POST /api/eval/retrieval`：执行检索链路评估
+- `POST /api/tasks/ops-report`：创建运营报告任务
+- `GET /api/tasks`：查看任务列表
+- `GET /api/tasks/{task_id}`：查看任务详情
 
 ## 当前版本的工程亮点
 
@@ -114,6 +118,7 @@ http://127.0.0.1:8000/api/health
 - 检索链路返回 BM25、Vector、Rerank 三类分数，便于解释召回依据。
 - 文档检查器可直接展示 chunking 结果和索引元数据，方便演示“不是简单切文本”。
 - 运营报告中的每个 issue 都带 `confidence`、`evidence` 和 `suggested_actions`。
+- 任务中心以 `tasks` 表记录运营任务状态，后续可替换为 Celery/RQ + Redis。
 - 知识图谱同时展示 document、section、topic 三类节点。
 - 检索评估接口可作为后续 RAGAS 或自定义 benchmark 的入口。
 
