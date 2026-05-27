@@ -6,7 +6,7 @@ from app.services.storage import KnowledgeStore
 
 
 def test_ingest_search_ask_agent_and_eval(tmp_path):
-    store = KnowledgeStore(tmp_path / "knowledgeops-test.db")
+    store = KnowledgeStore(f"sqlite:///{tmp_path / 'knowledgeops-test.db'}")
     app.dependency_overrides[routes.get_store] = lambda: store
     client = TestClient(app)
 
@@ -49,7 +49,7 @@ def test_ingest_search_ask_agent_and_eval(tmp_path):
 
         agent = client.post(
             "/api/agent/run",
-            json={"objective": "诊断知识库", "focus": "overview"},
+            json={"objective": "Diagnose the knowledge base", "focus": "overview"},
         )
         assert agent.status_code == 200
         assert len(agent.json()["stages"]) >= 4
@@ -62,4 +62,3 @@ def test_ingest_search_ask_agent_and_eval(tmp_path):
         assert evaluation.json()["cases"][0]["hit_count"] >= 1
     finally:
         app.dependency_overrides.clear()
-

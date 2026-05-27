@@ -30,7 +30,7 @@ router = APIRouter(prefix="/api")
 
 
 def get_store() -> KnowledgeStore:
-    return KnowledgeStore(get_settings().db_path)
+    return KnowledgeStore(get_settings().database_url)
 
 
 def get_embedder() -> DeterministicEmbeddingService:

@@ -1,127 +1,139 @@
 from __future__ import annotations
 
 import json
-import sqlite3
 from datetime import datetime
 from pathlib import Path
+
+from sqlalchemy import (
+    Column,
+    ForeignKey,
+    Integer,
+    MetaData,
+    String,
+    Table,
+    Text,
+    create_engine,
+    func,
+    select,
+)
+from sqlalchemy.engine import Engine, RowMapping
+
 from app.models.domain import Chunk, Document
 
 
+metadata = MetaData()
+
+documents_table = Table(
+    "documents",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("title", String(240), nullable=False),
+    Column("content", Text, nullable=False),
+    Column("source_type", String(64), nullable=False),
+    Column("source_uri", String(1024)),
+    Column("tags", Text, nullable=False),
+    Column("summary", Text, nullable=False),
+    Column("content_hash", String(128), nullable=False, index=True),
+    Column("created_at", String(64), nullable=False),
+)
+
+chunks_table = Table(
+    "chunks",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("document_id", String(64), ForeignKey("documents.id"), nullable=False, index=True),
+    Column("text", Text, nullable=False),
+    Column("section_path", Text, nullable=False),
+    Column("order_index", Integer, nullable=False),
+    Column("page", Integer),
+    Column("tags", Text, nullable=False),
+    Column("embedding", Text, nullable=False),
+)
+
+
 class KnowledgeStore:
-    def __init__(self, db_path: Path) -> None:
-        self.db_path = db_path
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._init_db()
+    """SQLAlchemy-backed metadata store.
 
-    def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+    Production is configured through a MySQL URL. Tests can still inject a SQLite
+    URL because the repository should be testable without a local MySQL daemon.
+    """
 
-    def _init_db(self) -> None:
-        with self._connect() as conn:
-            conn.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS documents (
-                    id TEXT PRIMARY KEY,
-                    title TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    source_type TEXT NOT NULL,
-                    source_uri TEXT,
-                    tags TEXT NOT NULL,
-                    summary TEXT NOT NULL,
-                    content_hash TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS chunks (
-                    id TEXT PRIMARY KEY,
-                    document_id TEXT NOT NULL,
-                    text TEXT NOT NULL,
-                    section_path TEXT NOT NULL,
-                    order_index INTEGER NOT NULL,
-                    page INTEGER,
-                    tags TEXT NOT NULL,
-                    embedding TEXT NOT NULL,
-                    FOREIGN KEY(document_id) REFERENCES documents(id)
-                );
-                CREATE INDEX IF NOT EXISTS idx_documents_hash ON documents(content_hash);
-                CREATE INDEX IF NOT EXISTS idx_chunks_document ON chunks(document_id);
-                """
-            )
+    def __init__(self, database_url: str | Path) -> None:
+        if isinstance(database_url, Path):
+            database_url = f"sqlite:///{database_url}"
+        self.database_url = str(database_url)
+        self.engine = self._create_engine(self.database_url)
+        metadata.create_all(self.engine)
+
+    def _create_engine(self, database_url: str) -> Engine:
+        kwargs = {"future": True, "pool_pre_ping": True}
+        if database_url.startswith("sqlite"):
+            kwargs["connect_args"] = {"check_same_thread": False}
+        return create_engine(database_url, **kwargs)
 
     def add_document(self, document: Document, chunks: list[Chunk]) -> Document:
         duplicate = self.find_document_by_hash(document.content_hash)
         if duplicate:
             return duplicate
-        with self._connect() as conn:
+        with self.engine.begin() as conn:
             conn.execute(
-                """
-                INSERT INTO documents
-                (id, title, content, source_type, source_uri, tags, summary, content_hash, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    document.id,
-                    document.title,
-                    document.content,
-                    document.source_type,
-                    document.source_uri,
-                    json.dumps(document.tags, ensure_ascii=False),
-                    document.summary,
-                    document.content_hash,
-                    document.created_at.isoformat(),
-                ),
+                documents_table.insert().values(
+                    id=document.id,
+                    title=document.title,
+                    content=document.content,
+                    source_type=document.source_type,
+                    source_uri=document.source_uri,
+                    tags=json.dumps(document.tags, ensure_ascii=False),
+                    summary=document.summary,
+                    content_hash=document.content_hash,
+                    created_at=document.created_at.isoformat(),
+                )
             )
-            conn.executemany(
-                """
-                INSERT INTO chunks
-                (id, document_id, text, section_path, order_index, page, tags, embedding)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                [
-                    (
-                        chunk.id,
-                        chunk.document_id,
-                        chunk.text,
-                        json.dumps(chunk.section_path, ensure_ascii=False),
-                        chunk.order_index,
-                        chunk.page,
-                        json.dumps(chunk.tags, ensure_ascii=False),
-                        json.dumps(chunk.embedding),
-                    )
-                    for chunk in chunks
-                ],
-            )
+            if chunks:
+                conn.execute(
+                    chunks_table.insert(),
+                    [
+                        {
+                            "id": chunk.id,
+                            "document_id": chunk.document_id,
+                            "text": chunk.text,
+                            "section_path": json.dumps(chunk.section_path, ensure_ascii=False),
+                            "order_index": chunk.order_index,
+                            "page": chunk.page,
+                            "tags": json.dumps(chunk.tags, ensure_ascii=False),
+                            "embedding": json.dumps(chunk.embedding),
+                        }
+                        for chunk in chunks
+                    ],
+                )
         return document
 
     def find_document_by_hash(self, content_hash: str) -> Document | None:
-        with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM documents WHERE content_hash = ? LIMIT 1", (content_hash,)
-            ).fetchone()
+        statement = select(documents_table).where(documents_table.c.content_hash == content_hash).limit(1)
+        with self.engine.connect() as conn:
+            row = conn.execute(statement).mappings().first()
         return self._row_to_document(row) if row else None
 
     def list_documents(self) -> list[Document]:
-        with self._connect() as conn:
-            rows = conn.execute("SELECT * FROM documents ORDER BY created_at DESC").fetchall()
+        statement = select(documents_table).order_by(documents_table.c.created_at.desc())
+        with self.engine.connect() as conn:
+            rows = conn.execute(statement).mappings().all()
         return [self._row_to_document(row) for row in rows]
 
     def list_chunks(self) -> list[Chunk]:
-        with self._connect() as conn:
-            rows = conn.execute("SELECT * FROM chunks ORDER BY document_id, order_index").fetchall()
+        statement = select(chunks_table).order_by(chunks_table.c.document_id, chunks_table.c.order_index)
+        with self.engine.connect() as conn:
+            rows = conn.execute(statement).mappings().all()
         return [self._row_to_chunk(row) for row in rows]
 
     def count_chunks(self, document_id: str | None = None) -> int:
-        with self._connect() as conn:
-            if document_id:
-                row = conn.execute(
-                    "SELECT COUNT(*) AS n FROM chunks WHERE document_id = ?", (document_id,)
-                ).fetchone()
-            else:
-                row = conn.execute("SELECT COUNT(*) AS n FROM chunks").fetchone()
-        return int(row["n"])
+        statement = select(func.count()).select_from(chunks_table)
+        if document_id:
+            statement = statement.where(chunks_table.c.document_id == document_id)
+        with self.engine.connect() as conn:
+            return int(conn.execute(statement).scalar_one())
 
-    def _row_to_document(self, row: sqlite3.Row) -> Document:
+    def _row_to_document(self, row: RowMapping) -> Document:
         return Document(
             id=row["id"],
             title=row["title"],
@@ -134,7 +146,7 @@ class KnowledgeStore:
             created_at=datetime.fromisoformat(row["created_at"]),
         )
 
-    def _row_to_chunk(self, row: sqlite3.Row) -> Chunk:
+    def _row_to_chunk(self, row: RowMapping) -> Chunk:
         return Chunk(
             id=row["id"],
             document_id=row["document_id"],
@@ -145,4 +157,3 @@ class KnowledgeStore:
             tags=json.loads(row["tags"]),
             embedding=json.loads(row["embedding"]),
         )
-

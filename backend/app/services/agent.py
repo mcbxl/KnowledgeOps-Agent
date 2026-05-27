@@ -1,162 +1,219 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import TypedDict
+
+from langgraph.graph import END, StateGraph
+
 from app.schemas.api import AgentRunResponse, AgentStage
 from app.services.ops import KnowledgeOpsService
 from app.services.retrieval import HybridRetrievalService
 from app.services.storage import KnowledgeStore
 
 
-class KnowledgeOpsAgent:
-    """Rule-based orchestration layer for the local MVP.
+class AgentState(TypedDict, total=False):
+    objective: str
+    focus: str
+    doc_count: int
+    chunk_count: int
+    quality_score: float
+    report: object
+    stages: list[AgentStage]
+    recommended_backlog: list[dict[str, str]]
 
-    The class keeps the same boundaries a LangGraph workflow would use in a
-    production version: observe, diagnose, plan, and recommend actions.
-    """
+
+class KnowledgeOpsAgent:
+    """LangGraph-orchestrated KnowledgeOps workflow."""
 
     def __init__(self, store: KnowledgeStore, retrieval: HybridRetrievalService) -> None:
         self.store = store
         self.retrieval = retrieval
         self.ops = KnowledgeOpsService(store)
+        self.graph = self._build_graph()
 
     def run(self, objective: str, focus: str = "overview") -> AgentRunResponse:
-        docs = self.store.list_documents()
-        chunks = self.store.list_chunks()
-        report = self.ops.build_report()
-        stages = [
-            self._observe_assets(len(docs), len(chunks), report.average_quality_score),
-            self._diagnose_quality(report),
-            self._diagnose_conflicts(report),
-            self._probe_retrieval(docs, focus),
-            self._plan_operations(report, focus),
-        ]
+        state = self.graph.invoke({"objective": objective, "focus": focus, "stages": []})
+        stages = state.get("stages", [])
         attention_count = sum(1 for stage in stages if stage.status == "needs_attention")
         summary = (
-            f"已扫描 {len(docs)} 份文档和 {len(chunks)} 个知识片段，"
-            f"平均质量分 {round(report.average_quality_score * 100)}%。"
+            f"Scanned {state.get('doc_count', 0)} documents and "
+            f"{state.get('chunk_count', 0)} chunks. "
+            f"Average quality score is {round(state.get('quality_score', 0.0) * 100)}%."
         )
         if attention_count:
-            summary += f" 发现 {attention_count} 个环节需要治理，建议优先处理高严重度问题。"
+            summary += f" {attention_count} workflow stages need attention."
         else:
-            summary += " 当前知识库状态稳定，可以继续扩充主题覆盖。"
+            summary += " The knowledge base is stable for the current checks."
         return AgentRunResponse(
             objective=objective,
             focus=focus,
             generated_at=datetime.now(timezone.utc),
             executive_summary=summary,
             stages=stages,
-            recommended_backlog=self._backlog(report, focus),
+            recommended_backlog=state.get("recommended_backlog", []),
         )
 
-    def _observe_assets(self, doc_count: int, chunk_count: int, quality: float) -> AgentStage:
-        status = "completed" if doc_count and chunk_count else "needs_attention"
-        actions = [] if status == "completed" else ["导入至少 3 份 Markdown、PDF 或技术网页作为初始知识集。"]
-        return AgentStage(
-            name="资产盘点",
+    def _build_graph(self):
+        workflow = StateGraph(AgentState)
+        workflow.add_node("observe_assets", self._observe_assets_node)
+        workflow.add_node("diagnose_quality", self._diagnose_quality_node)
+        workflow.add_node("diagnose_conflicts", self._diagnose_conflicts_node)
+        workflow.add_node("probe_retrieval", self._probe_retrieval_node)
+        workflow.add_node("plan_operations", self._plan_operations_node)
+        workflow.set_entry_point("observe_assets")
+        workflow.add_edge("observe_assets", "diagnose_quality")
+        workflow.add_edge("diagnose_quality", "diagnose_conflicts")
+        workflow.add_edge("diagnose_conflicts", "probe_retrieval")
+        workflow.add_edge("probe_retrieval", "plan_operations")
+        workflow.add_edge("plan_operations", END)
+        return workflow.compile()
+
+    def _observe_assets_node(self, state: AgentState) -> AgentState:
+        docs = self.store.list_documents()
+        chunks = self.store.list_chunks()
+        report = self.ops.build_report()
+        status = "completed" if docs and chunks else "needs_attention"
+        stage = AgentStage(
+            name="Asset inventory",
             status=status,
-            observation=f"当前共有 {doc_count} 份文档、{chunk_count} 个 chunk，质量均分 {round(quality * 100)}%。",
-            evidence=[f"documents={doc_count}", f"chunks={chunk_count}", f"quality={quality}"],
-            next_actions=actions,
+            observation=(
+                f"Found {len(docs)} documents, {len(chunks)} chunks, "
+                f"and an average quality score of {round(report.average_quality_score * 100)}%."
+            ),
+            evidence=[
+                f"documents={len(docs)}",
+                f"chunks={len(chunks)}",
+                f"quality={report.average_quality_score}",
+            ],
+            next_actions=[] if status == "completed" else ["Import documents before running governance tasks."],
         )
+        return {
+            **state,
+            "doc_count": len(docs),
+            "chunk_count": len(chunks),
+            "quality_score": report.average_quality_score,
+            "report": report,
+            "stages": [*state.get("stages", []), stage],
+        }
 
-    def _diagnose_quality(self, report) -> AgentStage:
+    def _diagnose_quality_node(self, state: AgentState) -> AgentState:
+        report = state["report"]
         low_quality = [issue for issue in report.issues if issue.kind == "low_quality"]
-        return AgentStage(
-            name="质量诊断",
+        stage = AgentStage(
+            name="Quality diagnosis",
             status="needs_attention" if low_quality else "completed",
             observation=(
-                f"发现 {len(low_quality)} 个低质量文档候选。"
+                f"Detected {len(low_quality)} low-quality document candidates."
                 if low_quality
-                else "未发现明显低质量文档，结构化程度基本可用。"
+                else "No obvious low-quality document candidates were detected."
             ),
             evidence=[issue.title for issue in low_quality[:5]],
             next_actions=[
-                "补充章节标题、摘要和关键结论。",
-                "将过短的零散笔记合并成主题页。",
+                "Add section headings, summary, source, and key takeaways.",
+                "Merge tiny notes into topic pages.",
             ]
             if low_quality
-            else ["继续保持文档的标题层级和来源元数据。"],
+            else ["Keep preserving section hierarchy and source metadata."],
         )
+        return {**state, "stages": [*state.get("stages", []), stage]}
 
-    def _diagnose_conflicts(self, report) -> AgentStage:
+    def _diagnose_conflicts_node(self, state: AgentState) -> AgentState:
+        report = state["report"]
         conflicts = [issue for issue in report.issues if issue.kind == "conflict_candidate"]
-        return AgentStage(
-            name="冲突检测",
+        stage = AgentStage(
+            name="Conflict detection",
             status="needs_attention" if conflicts else "completed",
             observation=(
-                f"发现 {len(conflicts)} 个潜在知识冲突，需要人工确认权威版本。"
+                f"Detected {len(conflicts)} potential knowledge conflicts."
                 if conflicts
-                else "未发现明显版本冲突或互斥结论。"
+                else "No obvious version or semantic conflict candidates were detected."
             ),
             evidence=[issue.title for issue in conflicts[:5]],
             next_actions=[
-                "为冲突文档标记版本、发布日期和权威来源。",
-                "保留最新实践，将旧实践标记为 deprecated。",
+                "Check publication dates and version metadata.",
+                "Mark authoritative guidance as current and old guidance as deprecated.",
             ]
             if conflicts
-            else ["继续导入新资料后定期运行冲突扫描。"],
+            else ["Continue running conflict scans after new imports."],
         )
+        return {**state, "stages": [*state.get("stages", []), stage]}
 
-    def _probe_retrieval(self, docs, focus: str) -> AgentStage:
+    def _probe_retrieval_node(self, state: AgentState) -> AgentState:
+        docs = self.store.list_documents()
         if not docs:
-            return AgentStage(
-                name="检索探测",
+            stage = AgentStage(
+                name="Retrieval probe",
                 status="needs_attention",
-                observation="暂无文档，无法评估检索效果。",
-                next_actions=["先导入样例文档，再执行检索评估。"],
+                observation="No documents are available for retrieval probing.",
+                next_actions=["Import documents and rerun the retrieval probe."],
             )
+            return {**state, "stages": [*state.get("stages", []), stage]}
+
         probe = docs[0].tags[0] if docs[0].tags else docs[0].title
         hits = self.retrieval.search(probe, "auto", 3)
         top_score = round(hits[0].score, 3) if hits else 0.0
         status = "completed" if top_score >= 0.2 else "needs_attention"
-        return AgentStage(
-            name="检索探测",
+        stage = AgentStage(
+            name="Retrieval probe",
             status=status,
-            observation=f"使用主题词「{probe}」进行探测，Top1 相关度为 {top_score}。",
+            observation=f"Probe query '{probe}' returned a Top1 score of {top_score}.",
             evidence=[hit.document.title for hit in hits],
             next_actions=[
-                "增加同义词标签和章节标题，提升关键词召回。",
-                "后续接入 Qdrant 与 Cross-Encoder reranker 做生产级召回。",
+                "Add synonym tags and clearer section headings.",
+                "Use the Eval workspace to build a retrieval benchmark.",
             ]
             if status == "needs_attention"
-            else ["保留当前 Hybrid Search 链路，并逐步扩充评测集。"],
+            else ["Keep the current Hybrid Search flow and expand benchmark queries."],
         )
+        return {**state, "stages": [*state.get("stages", []), stage]}
 
-    def _plan_operations(self, report, focus: str) -> AgentStage:
+    def _plan_operations_node(self, state: AgentState) -> AgentState:
+        report = state["report"]
+        focus = state.get("focus", "overview")
         high_issues = [issue for issue in report.issues if issue.severity == "high"]
         actions = [
-            "每周生成新增、过期、冲突、低质量文档报告。",
-            "为高频主题自动生成 FAQ 和学习路线。",
-            "将知识图谱中的孤立主题作为待补充知识点。",
+            "Generate weekly reports for new, stale, conflicting, and low-quality knowledge.",
+            "Generate FAQ and learning paths for high-frequency topics.",
+            "Use topic coverage to find missing prerequisite concepts.",
         ]
         if focus == "conflict":
-            actions.insert(0, "优先处理冲突候选，建立权威版本标记。")
+            actions.insert(0, "Prioritize conflict candidates and add authoritative version labels.")
         if focus == "retrieval":
-            actions.insert(0, "优先构建检索 benchmark，记录 query、期望文档和命中率。")
-        return AgentStage(
-            name="治理计划",
+            actions.insert(0, "Prioritize a retrieval benchmark with expected documents and chunks.")
+        stage = AgentStage(
+            name="Governance plan",
             status="needs_attention" if high_issues else "completed",
-            observation=f"当前高严重度问题 {len(high_issues)} 个，已生成下一步治理动作。",
+            observation=f"Found {len(high_issues)} high-severity issues and generated governance actions.",
             evidence=[issue.title for issue in high_issues[:5]],
             next_actions=actions,
         )
+        return {
+            **state,
+            "stages": [*state.get("stages", []), stage],
+            "recommended_backlog": self._backlog(report, focus),
+        }
 
     def _backlog(self, report, focus: str) -> list[dict[str, str]]:
         backlog = [
             {
                 "priority": "P0",
-                "item": "接入真实向量库与关键词索引",
-                "reason": "当前本地索引适合演示，生产版需要 Qdrant/Elasticsearch 支持规模化检索。",
+                "item": "Configure production MySQL metadata storage",
+                "reason": "The project now uses a SQLAlchemy MySQL URL as the production store boundary.",
+            },
+            {
+                "priority": "P0",
+                "item": "Connect a real vector and keyword index",
+                "reason": "Hybrid Search is interface-ready; Qdrant and Elasticsearch can replace local scoring.",
             },
             {
                 "priority": "P1",
-                "item": "建立检索评估集",
-                "reason": "用固定 query 衡量 TopK 命中率、引用覆盖率和答案忠实度。",
+                "item": "Build retrieval benchmarks",
+                "reason": "Track TopK hit rate, citation coverage, and answer faithfulness over fixed queries.",
             },
             {
                 "priority": "P1",
-                "item": "升级冲突检测",
-                "reason": "将启发式冲突候选升级为实体聚类、事实抽取和 NLI 判断。",
+                "item": "Upgrade conflict detection",
+                "reason": "Move from heuristic candidates to entity clustering, claim extraction, and NLI checks.",
             },
         ]
         if report.issues:
@@ -164,17 +221,16 @@ class KnowledgeOpsAgent:
                 0,
                 {
                     "priority": "P0",
-                    "item": "处理当前运营报告中的高严重度问题",
-                    "reason": f"报告中共有 {len(report.issues)} 个问题候选，会影响知识可信度。",
+                    "item": "Resolve high-severity governance issues",
+                    "reason": f"The latest report contains {len(report.issues)} issue candidates.",
                 },
             )
         if focus == "growth":
             backlog.append(
                 {
                     "priority": "P2",
-                    "item": "自动生成主题补全建议",
-                    "reason": "根据知识图谱发现孤立节点和缺失前置概念。",
+                    "item": "Generate topic gap recommendations",
+                    "reason": "Use the graph and topic coverage to discover isolated or missing concepts.",
                 }
             )
         return backlog
-
