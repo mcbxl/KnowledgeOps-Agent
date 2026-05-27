@@ -17,6 +17,7 @@ import {
 import {
   ask,
   evaluateRetrieval,
+  getDocument,
   getOpsReport,
   ingestText,
   ingestUrl,
@@ -132,6 +133,19 @@ function IngestPanel({ run, documents }) {
     '# React 18\n\nReact 18 recommends using createRoot for rendering applications.\n\n## Legacy API\n\nOlder documents may still mention ReactDOM.render, which is deprecated for new React 18 roots.',
   )
   const [url, setUrl] = useState('')
+  const [selectedDocumentId, setSelectedDocumentId] = useState(null)
+  const [documentDetail, setDocumentDetail] = useState(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
+
+  async function inspectDocument(documentId) {
+    setSelectedDocumentId(documentId)
+    setLoadingDetail(true)
+    try {
+      setDocumentDetail(await getDocument(documentId))
+    } finally {
+      setLoadingDetail(false)
+    }
+  }
 
   return (
     <section className="grid two">
@@ -196,8 +210,13 @@ function IngestPanel({ run, documents }) {
           />
         </div>
 
-        <DocumentList documents={documents} />
+        <DocumentList
+          documents={documents}
+          selectedDocumentId={selectedDocumentId}
+          onSelect={inspectDocument}
+        />
       </div>
+      <DocumentInspector detail={documentDetail} loading={loadingDetail} />
     </section>
   )
 }
@@ -531,7 +550,7 @@ function GraphPanel({ report }) {
   )
 }
 
-function DocumentList({ documents }) {
+function DocumentList({ documents, selectedDocumentId, onSelect }) {
   return (
     <div className="panel documentList">
       <div className="panelHeader">
@@ -542,13 +561,73 @@ function DocumentList({ documents }) {
         <p className="empty">No documents yet.</p>
       ) : (
         documents.map((doc) => (
-          <article className="documentRow" key={doc.id}>
+          <button
+            className={`documentRow ${selectedDocumentId === doc.id ? 'selected' : ''}`}
+            key={doc.id}
+            onClick={() => onSelect(doc.id)}
+            type="button"
+          >
             <strong>{doc.title}</strong>
             <span>{doc.source_type} · {doc.chunk_count} chunks</span>
             <p>{doc.summary}</p>
-          </article>
+          </button>
         ))
       )}
+    </div>
+  )
+}
+
+function DocumentInspector({ detail, loading }) {
+  if (loading) {
+    return (
+      <div className="panel inspector">
+        <Loader2 className="spin" size={20} />
+        <p>Loading document structure...</p>
+      </div>
+    )
+  }
+  if (!detail) {
+    return (
+      <div className="panel inspector">
+        <div className="panelHeader">
+          <BookOpen size={18} />
+          <h2>Document Inspector</h2>
+        </div>
+        <p className="empty">Select a document to inspect chunking, metadata, and index fields.</p>
+      </div>
+    )
+  }
+  return (
+    <div className="panel inspector">
+      <div className="panelHeader">
+        <BookOpen size={18} />
+        <h2>Document Inspector</h2>
+      </div>
+      <div className="inspectorMeta">
+        <span>{detail.source_type}</span>
+        <span>{detail.chunk_count} chunks</span>
+        <span>{detail.tags.join(', ') || 'no tags'}</span>
+      </div>
+      <h3>{detail.title}</h3>
+      <p className="preview">{detail.content_preview}</p>
+      <small>Hash: {detail.content_hash.slice(0, 18)}...</small>
+      <h3>Chunks</h3>
+      <div className="chunkList">
+        {detail.chunks.map((chunk) => (
+          <article className="chunkRow" key={chunk.id}>
+            <div>
+              <strong>#{chunk.order_index + 1}</strong>
+              <span>{chunk.section_path.join(' > ')}</span>
+            </div>
+            <p>{chunk.text}</p>
+            <footer>
+              <span>{chunk.token_count} tokens</span>
+              <span>{chunk.embedding_dimensions} dims</span>
+              <span>{chunk.tags.join(', ') || 'no tags'}</span>
+            </footer>
+          </article>
+        ))}
+      </div>
     </div>
   )
 }

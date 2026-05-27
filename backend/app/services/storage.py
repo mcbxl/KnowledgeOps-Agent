@@ -114,14 +114,22 @@ class KnowledgeStore:
             row = conn.execute(statement).mappings().first()
         return self._row_to_document(row) if row else None
 
+    def get_document(self, document_id: str) -> Document | None:
+        statement = select(documents_table).where(documents_table.c.id == document_id).limit(1)
+        with self.engine.connect() as conn:
+            row = conn.execute(statement).mappings().first()
+        return self._row_to_document(row) if row else None
+
     def list_documents(self) -> list[Document]:
         statement = select(documents_table).order_by(documents_table.c.created_at.desc())
         with self.engine.connect() as conn:
             rows = conn.execute(statement).mappings().all()
         return [self._row_to_document(row) for row in rows]
 
-    def list_chunks(self) -> list[Chunk]:
+    def list_chunks(self, document_id: str | None = None) -> list[Chunk]:
         statement = select(chunks_table).order_by(chunks_table.c.document_id, chunks_table.c.order_index)
+        if document_id:
+            statement = statement.where(chunks_table.c.document_id == document_id)
         with self.engine.connect() as conn:
             rows = conn.execute(statement).mappings().all()
         return [self._row_to_chunk(row) for row in rows]

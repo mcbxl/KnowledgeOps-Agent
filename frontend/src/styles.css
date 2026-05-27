@@ -234,6 +234,23 @@ textarea {
   border-top: 1px solid #edf0f3;
 }
 
+button.documentRow {
+  width: 100%;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.documentRow.selected {
+  background: #f5fbfd;
+  padding-left: 10px;
+  border-left: 3px solid #166f8f;
+}
+
 .documentRow:first-of-type,
 .hit:first-child {
   border-top: 0;
@@ -247,6 +264,59 @@ textarea {
 .evalCase p {
   color: #3d4856;
   line-height: 1.5;
+}
+
+.inspector {
+  grid-column: 1 / -1;
+}
+
+.inspectorMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.inspectorMeta span,
+.chunkRow footer span {
+  background: #f0f3f6;
+  border-radius: 999px;
+  color: #445366;
+  font-size: 12px;
+  padding: 4px 9px;
+}
+
+.preview {
+  color: #3d4856;
+  line-height: 1.6;
+  margin: 8px 0;
+}
+
+.chunkList {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.chunkRow {
+  border: 1px solid #e0e5ea;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.chunkRow div,
+.chunkRow footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chunkRow p {
+  color: #3d4856;
+  line-height: 1.5;
+  margin: 0;
 }
 
 .hits {

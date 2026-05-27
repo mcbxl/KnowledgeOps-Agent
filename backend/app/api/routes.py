@@ -7,6 +7,8 @@ from app.schemas.api import (
     AgentRunResponse,
     AskRequest,
     AskResponse,
+    ChunkResponse,
+    DocumentDetailResponse,
     DocumentResponse,
     IngestTextRequest,
     IngestUrlRequest,
@@ -25,6 +27,7 @@ from app.services.ops import KnowledgeOpsService
 from app.services.qa import AnswerAgent
 from app.services.retrieval import HybridRetrievalService, hit_snippet
 from app.services.storage import KnowledgeStore
+from app.services.text_utils import normalize_space, tokenize
 
 router = APIRouter(prefix="/api")
 
@@ -94,6 +97,27 @@ def list_documents(store: KnowledgeStore = Depends(get_store)):
     return [_document_response(doc, store) for doc in store.list_documents()]
 
 
+@router.get("/documents/{document_id}", response_model=DocumentDetailResponse)
+def get_document(document_id: str, store: KnowledgeStore = Depends(get_store)):
+    doc = store.get_document(document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    chunks = store.list_chunks(document_id)
+    return DocumentDetailResponse(
+        **_document_response(doc, store).model_dump(),
+        content_preview=_content_preview(doc.content),
+        content_hash=doc.content_hash,
+        chunks=[_chunk_response(chunk) for chunk in chunks],
+    )
+
+
+@router.get("/documents/{document_id}/chunks", response_model=list[ChunkResponse])
+def list_document_chunks(document_id: str, store: KnowledgeStore = Depends(get_store)):
+    if not store.get_document(document_id):
+        raise HTTPException(status_code=404, detail="Document not found.")
+    return [_chunk_response(chunk) for chunk in store.list_chunks(document_id)]
+
+
 @router.post("/search", response_model=list[SearchHit])
 def search(payload: SearchRequest, retrieval: HybridRetrievalService = Depends(get_retrieval)):
     hits = retrieval.search(payload.query, payload.intent, payload.limit)
@@ -158,3 +182,24 @@ def _document_response(doc, store: KnowledgeStore) -> DocumentResponse:
         created_at=doc.created_at,
         chunk_count=store.count_chunks(doc.id),
     )
+
+
+def _chunk_response(chunk) -> ChunkResponse:
+    return ChunkResponse(
+        id=chunk.id,
+        document_id=chunk.document_id,
+        text=chunk.text,
+        section_path=chunk.section_path,
+        order_index=chunk.order_index,
+        page=chunk.page,
+        tags=chunk.tags,
+        token_count=len(tokenize(chunk.text)),
+        embedding_dimensions=len(chunk.embedding),
+    )
+
+
+def _content_preview(content: str, max_chars: int = 1200) -> str:
+    cleaned = normalize_space(content)
+    if len(cleaned) <= max_chars:
+        return cleaned
+    return cleaned[:max_chars].rsplit(" ", 1)[0] + "..."

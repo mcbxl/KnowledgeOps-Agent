@@ -10,6 +10,7 @@ KnowledgeOps Agent 是一个面向个人/团队知识库的智能运营系统。
 - **Hybrid Search**：融合 BM25 风格关键词召回、本地确定性 embedding 向量召回和 rerank 分数。
 - **问题意图识别**：根据事实、概念、总结、对比类问题动态调整关键词、向量和 rerank 权重。
 - **引用溯源问答**：回答只基于知识库片段，并返回文档名、章节路径、原文片段和相关度分数。
+- **文档检查器**：支持查看单篇文档的正文预览、内容哈希、chunk 列表、章节路径、标签、Token 数和 embedding 维度。
 - **LangGraph Agent 工作流**：使用 `StateGraph` 编排资产盘点、质量诊断、冲突检测、检索探测和治理计划节点。
 - **证据化运营报告**：对重复、低质量、冲突候选问题输出置信度、证据片段和建议动作。
 - **Topic Coverage**：识别薄弱主题、健康主题和高密度主题，用于知识补全和学习路线生成。
@@ -98,6 +99,8 @@ http://127.0.0.1:8000/api/health
 - `POST /api/documents/url`：导入网页
 - `POST /api/documents/upload`：上传本地文件
 - `GET /api/documents`：查看文档列表
+- `GET /api/documents/{document_id}`：查看文档详情和 chunk 结构
+- `GET /api/documents/{document_id}/chunks`：查看单篇文档的 chunk 列表
 - `POST /api/search`：Hybrid Search 检索
 - `POST /api/ask`：引用溯源问答
 - `GET /api/ops/report`：生成知识库运营报告
@@ -109,6 +112,7 @@ http://127.0.0.1:8000/api/health
 - 使用 MySQL 作为元数据主库，SQLAlchemy 封装存储边界。
 - 使用 LangGraph `StateGraph` 编排 Agent 节点，工作流阶段可观测、可扩展。
 - 检索链路返回 BM25、Vector、Rerank 三类分数，便于解释召回依据。
+- 文档检查器可直接展示 chunking 结果和索引元数据，方便演示“不是简单切文本”。
 - 运营报告中的每个 issue 都带 `confidence`、`evidence` 和 `suggested_actions`。
 - 知识图谱同时展示 document、section、topic 三类节点。
 - 检索评估接口可作为后续 RAGAS 或自定义 benchmark 的入口。
@@ -121,4 +125,3 @@ http://127.0.0.1:8000/api/health
 4. 使用 bge-reranker、Jina Reranker 或 Cohere Rerank 替换启发式 rerank。
 5. 引入 Celery/RQ + Redis，将文档解析、索引构建和运营报告改为异步任务。
 6. 增加 RAGAS 或自定义 benchmark，评估召回率、引用覆盖率和答案忠实度。
-

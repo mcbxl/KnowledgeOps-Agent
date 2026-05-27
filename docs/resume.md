@@ -17,6 +17,7 @@ KnowledgeOps Agent：个人知识库运营与推理 Agent
 - 设计多源文档解析 Pipeline，支持 Markdown、网页和文件上传，自动提取标题、摘要、标签、来源和内容哈希。
 - 使用 SQLAlchemy + MySQL 管理知识库元数据，并保留向量索引和关键词索引的可替换边界。
 - 实现层级化 Chunking 策略，结合标题结构、段落语义边界和元数据继承，保留章节路径、来源和标签信息。
+- 设计文档检查器，支持查看正文预览、内容哈希、chunk 列表、章节路径、Token 数和 embedding 维度，便于验证索引构建质量。
 - 构建 Hybrid Search 检索链路，融合 BM25 风格关键词召回、Embedding 向量召回与 rerank 重排序，提高复杂问题召回准确率。
 - 引入问题意图识别机制，根据事实、概念、总结、对比类问题动态调整关键词、向量和 rerank 权重。
 - 实现引用溯源问答机制，将生成答案与原始文档片段绑定，返回文档名、章节路径、原文片段和相关度分数。
@@ -32,4 +33,3 @@ KnowledgeOps Agent：个人知识库运营与推理 Agent
 - 增加 Alembic migration 管理 MySQL 表结构演进。
 - 接入 bge-reranker、Jina Reranker 或 Cohere Rerank，提高重排质量。
 - 引入 RAGAS 或自定义 benchmark，评估检索召回率、引用覆盖率和答案忠实度。
-

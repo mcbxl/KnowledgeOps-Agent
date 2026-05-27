@@ -19,6 +19,10 @@ export function listDocuments() {
   return request('/documents')
 }
 
+export function getDocument(documentId) {
+  return request(`/documents/${documentId}`)
+}
+
 export function ingestText(payload) {
   return request('/documents/text', {
     method: 'POST',

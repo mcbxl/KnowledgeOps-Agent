@@ -9,6 +9,7 @@ KnowledgeOps Agent 面向个人或团队知识库，核心目标不是简单 RAG
 ```text
 前端工作台
   ├─ 文档导入
+  ├─ 文档检查器
   ├─ 知识库检索
   ├─ 引用问答
   ├─ 运营报告
@@ -48,6 +49,20 @@ KnowledgeOps Agent 面向个人或团队知识库，核心目标不是简单 RAG
 4. Chunking Pipeline 按标题层级和段落语义边界切分。
 5. 每个 chunk 绑定文档 ID、章节路径、顺序、标签和 embedding。
 6. chunk 和文档元数据写入 MySQL。
+
+## 文档检查器
+
+前端提供 Document Inspector，用于展示单篇文档的：
+
+- 正文预览
+- 内容哈希
+- chunk 列表
+- 每个 chunk 的章节路径
+- Token 数
+- embedding 维度
+- 标签信息
+
+这个功能用于验证层级化切分和元数据绑定是否正确，也方便在面试或演示时展示系统不是简单固定长度切块。
 
 ## Hybrid Search 检索链路
 
@@ -107,4 +122,3 @@ Topic Coverage 用文档标签和 chunk 标签统计主题覆盖：
 - `mentions`：章节提到某个主题。
 
 生产版本可以继续加入实体节点、概念节点、引用关系和冲突关系。
-

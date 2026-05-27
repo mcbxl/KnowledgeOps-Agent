@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Literal
+
 from pydantic import BaseModel, Field, HttpUrl
 
 
@@ -25,6 +26,24 @@ class DocumentResponse(BaseModel):
     summary: str
     created_at: datetime
     chunk_count: int
+
+
+class ChunkResponse(BaseModel):
+    id: str
+    document_id: str
+    text: str
+    section_path: list[str]
+    order_index: int
+    page: int | None = None
+    tags: list[str]
+    token_count: int
+    embedding_dimensions: int
+
+
+class DocumentDetailResponse(DocumentResponse):
+    content_preview: str
+    content_hash: str
+    chunks: list[ChunkResponse]
 
 
 class SearchRequest(BaseModel):
@@ -99,7 +118,7 @@ class OpsReport(BaseModel):
 
 
 class AgentRunRequest(BaseModel):
-    objective: str = Field(default="诊断知识库质量并给出运营建议", min_length=1)
+    objective: str = Field(default="Diagnose knowledge-base quality and suggest operations.", min_length=1)
     focus: Literal["overview", "quality", "conflict", "retrieval", "growth"] = "overview"
 
 

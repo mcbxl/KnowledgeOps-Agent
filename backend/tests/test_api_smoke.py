@@ -26,7 +26,13 @@ def test_ingest_search_ask_agent_and_eval(tmp_path):
             },
         )
         assert ingest.status_code == 200
+        document_id = ingest.json()["id"]
         assert ingest.json()["chunk_count"] >= 1
+
+        detail = client.get(f"/api/documents/{document_id}")
+        assert detail.status_code == 200
+        assert detail.json()["chunks"][0]["embedding_dimensions"] > 0
+        assert detail.json()["chunks"][0]["token_count"] > 0
 
         search = client.post(
             "/api/search",
