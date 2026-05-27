@@ -73,6 +73,17 @@ class QualityIssue(BaseModel):
     title: str
     description: str
     document_ids: list[str] = []
+    confidence: float = 0.0
+    evidence: list[str] = []
+    suggested_actions: list[str] = []
+
+
+class TopicCoverage(BaseModel):
+    topic: str
+    document_count: int
+    chunk_count: int
+    quality_hint: Literal["thin", "healthy", "dense"]
+    related_documents: list[str] = []
 
 
 class OpsReport(BaseModel):
@@ -81,6 +92,7 @@ class OpsReport(BaseModel):
     chunk_count: int
     average_quality_score: float
     issues: list[QualityIssue]
+    topic_coverage: list[TopicCoverage]
     faqs: list[dict[str, str]]
     learning_path: list[str]
     graph: dict

@@ -6,6 +6,7 @@ import {
   Boxes,
   ClipboardCheck,
   FilePlus2,
+  Gauge,
   GitBranch,
   Loader2,
   MessageSquareText,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react'
 import {
   ask,
+  evaluateRetrieval,
   getOpsReport,
   ingestText,
   ingestUrl,
@@ -30,6 +32,7 @@ const tabs = [
   { id: 'ask', label: 'Ask', icon: MessageSquareText },
   { id: 'ops', label: 'Ops', icon: Sparkles },
   { id: 'agent', label: 'Agent', icon: ClipboardCheck },
+  { id: 'eval', label: 'Eval', icon: Gauge },
   { id: 'graph', label: 'Graph', icon: GitBranch },
 ]
 
@@ -116,6 +119,7 @@ export default function App() {
         {activeTab === 'ask' && <AskPanel />}
         {activeTab === 'ops' && <OpsPanel report={report} refresh={refresh} />}
         {activeTab === 'agent' && <AgentPanel />}
+        {activeTab === 'eval' && <EvalPanel />}
         {activeTab === 'graph' && <GraphPanel report={report} />}
       </main>
     </div>
@@ -236,7 +240,7 @@ function SearchPanel() {
 }
 
 function AskPanel() {
-  const [query, setQuery] = useState('React 18 应该使用哪个渲染 API？')
+  const [query, setQuery] = useState('Which rendering API should React 18 use?')
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -307,8 +311,16 @@ function OpsPanel({ report, refresh }) {
             report.issues.map((issue, index) => (
               <article className={`issue ${issue.severity}`} key={`${issue.kind}-${index}`}>
                 <strong>{issue.title}</strong>
-                <span>{issue.kind} / {issue.severity}</span>
+                <span>
+                  {issue.kind} / {issue.severity} / confidence {Math.round(issue.confidence * 100)}%
+                </span>
                 <p>{issue.description}</p>
+                {issue.evidence?.length > 0 && <small>Evidence: {issue.evidence.slice(0, 4).join(' | ')}</small>}
+                {issue.suggested_actions?.length > 0 && (
+                  <ul>
+                    {issue.suggested_actions.map((action) => <li key={action}>{action}</li>)}
+                  </ul>
+                )}
               </article>
             ))
           )}
@@ -329,6 +341,15 @@ function OpsPanel({ report, refresh }) {
           <ol className="path">
             {report.learning_path.map((step) => <li key={step}>{step}</li>)}
           </ol>
+          <h3>Topic Coverage</h3>
+          <div className="coverageGrid">
+            {report.topic_coverage.map((topic) => (
+              <article className={`coverage ${topic.quality_hint}`} key={topic.topic}>
+                <strong>{topic.topic}</strong>
+                <span>{topic.document_count} docs · {topic.chunk_count} chunks</span>
+              </article>
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -336,7 +357,7 @@ function OpsPanel({ report, refresh }) {
 }
 
 function AgentPanel() {
-  const [objective, setObjective] = useState('诊断知识库质量并给出下一步运营建议')
+  const [objective, setObjective] = useState('Diagnose knowledge-base quality and generate governance actions.')
   const [focus, setFocus] = useState('overview')
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -416,6 +437,65 @@ function AgentPanel() {
   )
 }
 
+function EvalPanel() {
+  const [queries, setQueries] = useState('React createRoot\nHybrid search\nRerank')
+  const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  async function submit(event) {
+    event.preventDefault()
+    setLoading(true)
+    try {
+      const queryList = queries
+        .split('\n')
+        .map((query) => query.trim())
+        .filter(Boolean)
+      setResult(await evaluateRetrieval({ queries: queryList, limit: 5 }))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <section className="grid two">
+      <form className="panel compact" onSubmit={submit}>
+        <div className="panelHeader">
+          <Gauge size={18} />
+          <h2>Retrieval Evaluation</h2>
+        </div>
+        <label>
+          Benchmark queries
+          <textarea value={queries} onChange={(event) => setQueries(event.target.value)} />
+        </label>
+        <button className="primary" type="submit">
+          {loading ? <Loader2 className="spin" size={17} /> : <Gauge size={17} />}
+          Evaluate
+        </button>
+      </form>
+
+      <div className="panel">
+        {result ? (
+          <>
+            <div className="metrics evalMetrics">
+              <Metric label="Avg Top Score" value={result.average_top_score} />
+              <Metric label="Citation Ready" value={`${Math.round(result.citation_ready_rate * 100)}%`} />
+            </div>
+            {result.cases.map((item) => (
+              <article className="evalCase" key={item.query}>
+                <strong>{item.query}</strong>
+                <span>{item.hit_count} hits · top score {item.top_score}</span>
+                <p>{item.recommendation}</p>
+              </article>
+            ))}
+          </>
+        ) : (
+          <p className="empty">Run benchmark queries to inspect retrieval quality.</p>
+        )}
+      </div>
+    </section>
+  )
+}
+
 function GraphPanel({ report }) {
   const flow = useMemo(() => {
     const graph = report?.graph || { nodes: [], edges: [] }
@@ -423,8 +503,8 @@ function GraphPanel({ report }) {
       id: node.id,
       data: { label: node.label },
       position: {
-        x: node.type === 'document' ? 40 : 420,
-        y: 55 * index,
+        x: node.type === 'document' ? 40 : node.type === 'section' ? 360 : 690,
+        y: 48 * index,
       },
       className: node.type,
     }))
@@ -432,7 +512,7 @@ function GraphPanel({ report }) {
       id: `edge-${index}`,
       source: edge.source,
       target: edge.target,
-      animated: false,
+      animated: edge.type === 'mentions',
     }))
     return { nodes, edges }
   }, [report])

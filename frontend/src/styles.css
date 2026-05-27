@@ -132,7 +132,9 @@ h3 {
 .documentRow span,
 .hit span,
 .citation span,
-.issue span {
+.issue span,
+.coverage span,
+.evalCase span {
   color: #617082;
 }
 
@@ -224,7 +226,8 @@ textarea {
 .hit,
 .citation,
 .issue,
-.faq {
+.faq,
+.evalCase {
   display: grid;
   gap: 6px;
   padding: 12px 0;
@@ -240,7 +243,8 @@ textarea {
 .hit p,
 .citation p,
 .issue p,
-.faq p {
+.faq p,
+.evalCase p {
   color: #3d4856;
   line-height: 1.5;
 }
@@ -308,6 +312,47 @@ textarea {
   padding-left: 12px;
 }
 
+.issue small {
+  color: #617082;
+  line-height: 1.45;
+}
+
+.issue ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #3d4856;
+}
+
+.coverageGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.coverage {
+  border: 1px solid #e0e5ea;
+  border-radius: 8px;
+  padding: 10px;
+  display: grid;
+  gap: 4px;
+}
+
+.coverage.thin {
+  border-color: #f0c36a;
+  background: #fffaf0;
+}
+
+.coverage.healthy {
+  border-color: #9fd5c6;
+  background: #f4fbf8;
+}
+
+.coverage.dense {
+  border-color: #8ac4d4;
+  background: #f5fbfd;
+}
+
 .path {
   padding-left: 20px;
   color: #3d4856;
@@ -325,9 +370,16 @@ textarea {
   padding: 9px 11px;
 }
 
-.react-flow__node.tag {
+.react-flow__node.topic {
   background: #fff7ed;
   border: 1px solid #fdba74;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.react-flow__node.section {
+  background: #f7f7fb;
+  border: 1px solid #c6c8d2;
   border-radius: 8px;
   padding: 8px 10px;
 }
@@ -354,7 +406,7 @@ textarea {
   }
 
   .nav {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 
   .nav button {
@@ -373,7 +425,8 @@ textarea {
 
   .grid.two,
   .queryBar,
-  .metrics {
+  .metrics,
+  .coverageGrid {
     grid-template-columns: 1fr;
   }
 }
@@ -425,4 +478,9 @@ textarea {
 .backlog p {
   color: #3d4856;
   line-height: 1.5;
+}
+
+.evalMetrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 10px;
 }
