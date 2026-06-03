@@ -97,6 +97,7 @@ KNOWLEDGEOPS_QDRANT_COLLECTION=knowledgeops_chunks
 
 - 设置 `KNOWLEDGEOPS_API_KEY` 后，除健康检查和 OpenAPI 文档外的接口都要求 `X-API-Key`。
 - 所有响应都会返回 `X-Request-ID`，调用方也可以主动传入该 header，便于问题排查和日志关联。
+- 文档导入会扫描 prompt injection、secret exfiltration 和系统提示泄露类指令，命中后追加 `prompt-injection-risk` 标签，并在 Ops Report 中生成 `prompt_injection_risk` issue。
 - URL 接入只允许 `http/https`，默认拦截 localhost、loopback、private IP、link-local、reserved IP，降低 SSRF 风险。
 - 文件上传限制最大字节数和扩展名，默认仅允许 `txt/md/markdown/pdf`。
 - CORS 来源通过 `KNOWLEDGEOPS_CORS_ORIGINS` 配置，避免硬编码生产域名。
@@ -144,6 +145,7 @@ KNOWLEDGEOPS_QDRANT_COLLECTION=knowledgeops_chunks
 - Benchmark test：检查保存、列表和运行基准集，以及 expected hit rate。
 - Task event test：检查任务创建、运行和事件历史查询。
 - API security test：检查 request id 响应头、API Key 拦截和放行路径。
+- Prompt injection test：检查可疑文档会被打标并进入 Ops Report。
 - 安全测试：私有 URL、非法扩展名、超大上传拦截。
 - Provider 测试：本地答案生成器可复现、向量索引分数参与 hybrid retrieval。
 

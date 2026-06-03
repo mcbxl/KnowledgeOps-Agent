@@ -4,6 +4,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 
 from app.schemas.api import OpsReport, QualityIssue, TopicCoverage
+from app.services.guardrails import PromptInjectionScanner
 from app.services.storage import KnowledgeStore
 from app.services.text_utils import normalize_space, tokenize
 
@@ -11,6 +12,7 @@ from app.services.text_utils import normalize_space, tokenize
 class KnowledgeOpsService:
     def __init__(self, store: KnowledgeStore) -> None:
         self.store = store
+        self.prompt_scanner = PromptInjectionScanner()
 
     def build_report(self) -> OpsReport:
         docs = self.store.list_documents()
@@ -18,6 +20,7 @@ class KnowledgeOpsService:
         issues: list[QualityIssue] = []
         issues.extend(self._duplicate_issues(docs))
         issues.extend(self._quality_issues(docs))
+        issues.extend(self._prompt_injection_issues(docs))
         issues.extend(self._conflict_candidates(chunks))
         topic_coverage = self._topic_coverage(docs, chunks)
         quality_scores = [self._quality_score(doc.content) for doc in docs]
@@ -84,6 +87,34 @@ class KnowledgeOpsService:
                         "Add section headings and a short summary.",
                         "Merge tiny notes into a topic page.",
                         "Add source, version, and key takeaways.",
+                    ],
+                )
+            )
+        return issues
+
+    def _prompt_injection_issues(self, docs) -> list[QualityIssue]:
+        issues: list[QualityIssue] = []
+        for doc in docs:
+            report = self.prompt_scanner.scan(doc.content)
+            if not report.is_risky:
+                continue
+            severity = "high" if report.risk_level == "high" else "medium"
+            issues.append(
+                QualityIssue(
+                    kind="prompt_injection_risk",
+                    severity=severity,
+                    title=f"Prompt injection risk: {doc.title}",
+                    description=(
+                        "The document contains instructions that look like prompt injection, "
+                        "secret exfiltration, or attempts to override system/developer guidance."
+                    ),
+                    document_ids=[doc.id],
+                    confidence=0.92 if severity == "high" else 0.74,
+                    evidence=[finding.snippet for finding in report.findings[:5]],
+                    suggested_actions=[
+                        "Review the source before using it for answer generation.",
+                        "Keep this document quarantined or tag it as untrusted.",
+                        "Prefer trusted source allowlists for web ingestion.",
                     ],
                 )
             )

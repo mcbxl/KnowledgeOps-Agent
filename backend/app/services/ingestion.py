@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 from app.core.config import Settings
 from app.models.domain import Document
 from app.services.chunking import HierarchicalChunker
+from app.services.guardrails import PromptInjectionScanner
 from app.services.security import validate_public_http_url, validate_upload
 from app.services.storage import KnowledgeStore
 from app.services.text_utils import extract_tags, normalize_space, summarize
@@ -24,6 +25,7 @@ class IngestionService:
         self.chunker = chunker
         self.settings = settings
         self.vector_index = vector_index
+        self.prompt_scanner = PromptInjectionScanner()
 
     def ingest_text(
         self,
@@ -33,7 +35,11 @@ class IngestionService:
         source_uri: str | None = None,
         tags: list[str] | None = None,
     ) -> Document:
-        tags = list(dict.fromkeys([*(tags or []), *extract_tags(title, content)]))
+        tags = [*(tags or []), *extract_tags(title, content)]
+        prompt_report = self.prompt_scanner.scan(content)
+        if prompt_report.is_risky:
+            tags.extend(["security-risk", "prompt-injection-risk"])
+        tags = list(dict.fromkeys(tags))
         document = Document(
             title=title.strip(),
             content=content,

@@ -18,7 +18,7 @@ This document summarizes why the project is ready to present as a resume-grade a
 | Benchmarks | Saved retrieval benchmarks and expected hit rate |
 | Tasks | Background task execution and task event timeline |
 | Runtime readiness | Provider, vector DB, metadata store, and security checks |
-| Security | API key auth, request ID, SSRF guard, upload constraints, CORS config |
+| Security | API key auth, request ID, prompt injection detection, SSRF guard, upload constraints, CORS config |
 | Tests | API smoke, provider fallback, vector index, security, runtime, benchmark, task events |
 | Frontend | Operational workspace for ingest, search, ask, ops, agent, runtime, eval, tasks, graph |
 
@@ -29,6 +29,7 @@ The project includes the surrounding production concerns that are usually missin
 - Retrieval is explainable through separate lexical, vector, and rerank scores.
 - Answers are audited against retrieved evidence.
 - Runtime status makes local fallback vs production provider state explicit.
+- Prompt injection scanning flags untrusted document instructions before they silently influence answers.
 - Benchmarks can be saved and re-run to catch retrieval regressions.
 - LangGraph models the governance workflow as observable stages.
 - Tasks have status and timeline events.
