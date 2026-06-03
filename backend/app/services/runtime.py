@@ -148,6 +148,7 @@ class RuntimeStatusService:
 
     def _security_component(self) -> RuntimeComponent:
         checks = [
+            f"api_key={'enabled' if self.settings.api_key else 'disabled'}",
             f"web_ingest={'enabled' if self.settings.allow_web_ingest else 'disabled'}",
             f"private_web_ingest={'enabled' if self.settings.allow_private_web_ingest else 'blocked'}",
             f"max_upload_bytes={self.settings.max_upload_bytes}",
@@ -162,11 +163,19 @@ class RuntimeStatusService:
                 detail="Private web ingestion is enabled; disable it for production to reduce SSRF risk.",
                 checks=checks,
             )
+        if not self.settings.api_key and self.settings.environment.lower() == "production":
+            return RuntimeComponent(
+                name="Security Guardrails",
+                status="action_required",
+                provider="FastAPI middleware",
+                detail="Production environment should configure KNOWLEDGEOPS_API_KEY.",
+                checks=checks,
+            )
         return RuntimeComponent(
             name="Security Guardrails",
             status="ok",
-            provider="FastAPI validation",
-            detail="SSRF-sensitive targets are blocked and uploads are constrained.",
+            provider="FastAPI middleware",
+            detail="SSRF-sensitive targets are blocked, uploads are constrained, and API key state is explicit.",
             checks=checks,
         )
 

@@ -21,7 +21,7 @@ KnowledgeOps Agent：个人知识库运营与推理 Agent
 - 增加 Grounding Audit 能力，对答案与引用片段做 evidence coverage 检查，输出 groundedness 分数、unsupported terms 和风险提示。
 - 实现层级化 Chunking 策略，结合标题结构、段落语义边界和元数据继承，保留章节路径、来源和标签信息。
 - 使用 SQLAlchemy + MySQL 管理知识库元数据，同时保留 SQLite 注入能力，支持无 MySQL 环境下的自动化测试。
-- 增加生产安全边界：URL 接入拦截 localhost/private IP 等 SSRF 风险目标，上传限制文件大小和扩展名，CORS 来源通过环境变量配置。
+- 增加生产安全边界：API Key 鉴权、请求追踪 ID、URL 接入拦截 localhost/private IP 等 SSRF 风险目标，上传限制文件大小和扩展名，CORS 来源通过环境变量配置。
 - 实现 Runtime Readiness 自检接口和前端面板，展示数据库、Embedding、LLM、Qdrant 和安全策略的生产就绪状态。
 - 提供检索评测服务，评估 TopK 召回、Top1 分数和 citation-ready 比例，为后续 RAGAS/自定义 benchmark 打基础。
 - 为运维任务中心设计任务表，记录任务状态、输入参数、执行结果和错误信息，便于后续替换为 Celery/RQ + Redis。

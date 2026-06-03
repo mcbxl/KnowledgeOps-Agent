@@ -95,6 +95,8 @@ KNOWLEDGEOPS_QDRANT_COLLECTION=knowledgeops_chunks
 
 生产安全边界包括：
 
+- 设置 `KNOWLEDGEOPS_API_KEY` 后，除健康检查和 OpenAPI 文档外的接口都要求 `X-API-Key`。
+- 所有响应都会返回 `X-Request-ID`，调用方也可以主动传入该 header，便于问题排查和日志关联。
 - URL 接入只允许 `http/https`，默认拦截 localhost、loopback、private IP、link-local、reserved IP，降低 SSRF 风险。
 - 文件上传限制最大字节数和扩展名，默认仅允许 `txt/md/markdown/pdf`。
 - CORS 来源通过 `KNOWLEDGEOPS_CORS_ORIGINS` 配置，避免硬编码生产域名。
@@ -109,6 +111,7 @@ KNOWLEDGEOPS_QDRANT_COLLECTION=knowledgeops_chunks
 - Answer Generator：当前使用本地引用生成器还是 LangChain ChatOpenAI。
 - Vector Index：当前使用 Qdrant 还是数据库内 JSON embedding fallback。
 - Security Guardrails：检查 private web ingest、上传大小、扩展名白名单和 CORS 来源数量。
+- API Guard：生产环境建议配置 `KNOWLEDGEOPS_API_KEY`，前端可通过 `VITE_API_KEY` 自动附加访问密钥。
 
 前端 Runtime 面板会展示每个组件的 `ok`、`degraded`、`action_required` 状态和推荐动作，方便面试演示“不是只会调用模型，而是知道生产系统怎么自检”。
 
@@ -117,6 +120,7 @@ KNOWLEDGEOPS_QDRANT_COLLECTION=knowledgeops_chunks
 - API smoke test：导入、检索、问答、Agent、评测、任务中心。
 - Runtime test：检查本地 fallback 状态和生产配置缺失时的 action_required。
 - Grounding test：检查答案和引用证据的覆盖评分。
+- API security test：检查 request id 响应头、API Key 拦截和放行路径。
 - 安全测试：私有 URL、非法扩展名、超大上传拦截。
 - Provider 测试：本地答案生成器可复现、向量索引分数参与 hybrid retrieval。
 

@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     environment: str = Field(default="development", alias="KNOWLEDGEOPS_ENVIRONMENT")
+    api_key: str | None = Field(default=None, alias="KNOWLEDGEOPS_API_KEY")
     database_url: str = Field(
         default="mysql+pymysql://knowledgeops:knowledgeops@127.0.0.1:3306/knowledgeops?charset=utf8mb4",
         alias="KNOWLEDGEOPS_DATABASE_URL",

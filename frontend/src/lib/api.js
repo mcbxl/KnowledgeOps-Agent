@@ -1,9 +1,15 @@
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000/api'
+const API_KEY = import.meta.env.VITE_API_KEY || ''
+
+function authHeaders() {
+  return API_KEY ? { 'X-API-Key': API_KEY } : {}
+}
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
     headers: {
       'Content-Type': 'application/json',
+      ...authHeaders(),
       ...(options.headers || {}),
     },
     ...options,
@@ -42,6 +48,7 @@ export async function uploadDocument(file) {
   form.append('file', file)
   const response = await fetch(`${API_BASE}/documents/upload`, {
     method: 'POST',
+    headers: authHeaders(),
     body: form,
   })
   if (!response.ok) throw new Error(await response.text())
