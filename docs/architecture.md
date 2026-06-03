@@ -27,6 +27,7 @@ FastAPI Backend
        -> local citation generator
        -> LangChain ChatOpenAI grounded generation
   -> LangGraph KnowledgeOps Agent
+  -> Runtime Readiness Service
   -> Evaluation / Task / Ops Services
 
 Storage
@@ -87,9 +88,22 @@ KNOWLEDGEOPS_QDRANT_COLLECTION=knowledgeops_chunks
 - CORS 来源通过 `KNOWLEDGEOPS_CORS_ORIGINS` 配置，避免硬编码生产域名。
 - 模型 API Key 只通过环境变量读取，不写入代码或响应。
 
+## Runtime Readiness
+
+`GET /api/runtime/status` 用于展示系统是否具备生产运行条件。它会检查：
+
+- Metadata Store：数据库连接是否可执行 `SELECT 1`，并标识 MySQL/SQLite。
+- Embedding Model：当前使用本地 deterministic embedding 还是 LangChain OpenAIEmbeddings，生产配置缺 Key 或缺依赖时标记为 `action_required`。
+- Answer Generator：当前使用本地引用生成器还是 LangChain ChatOpenAI。
+- Vector Index：当前使用 Qdrant 还是数据库内 JSON embedding fallback。
+- Security Guardrails：检查 private web ingest、上传大小、扩展名白名单和 CORS 来源数量。
+
+前端 Runtime 面板会展示每个组件的 `ok`、`degraded`、`action_required` 状态和推荐动作，方便面试演示“不是只会调用模型，而是知道生产系统怎么自检”。
+
 测试覆盖包括：
 
 - API smoke test：导入、检索、问答、Agent、评测、任务中心。
+- Runtime test：检查本地 fallback 状态和生产配置缺失时的 action_required。
 - 安全测试：私有 URL、非法扩展名、超大上传拦截。
 - Provider 测试：本地答案生成器可复现、向量索引分数参与 hybrid retrieval。
 

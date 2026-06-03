@@ -66,6 +66,10 @@ export function getOpsReport() {
   return request('/ops/report')
 }
 
+export function getRuntimeStatus() {
+  return request('/runtime/status')
+}
+
 export function runAgent(payload) {
   return request('/agent/run', {
     method: 'POST',

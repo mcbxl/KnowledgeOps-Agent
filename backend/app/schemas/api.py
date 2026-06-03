@@ -159,6 +159,22 @@ class RetrievalEvalResponse(BaseModel):
     cases: list[RetrievalEvalCase]
 
 
+class RuntimeComponent(BaseModel):
+    name: str
+    status: Literal["ok", "degraded", "action_required"]
+    provider: str | None = None
+    detail: str
+    checks: list[str] = []
+
+
+class RuntimeStatusResponse(BaseModel):
+    generated_at: datetime
+    environment: str
+    status: Literal["ok", "degraded", "action_required"]
+    components: list[RuntimeComponent]
+    recommendations: list[str] = []
+
+
 class TaskResponse(BaseModel):
     id: str
     task_type: str

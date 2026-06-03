@@ -15,6 +15,7 @@ from app.schemas.api import (
     OpsReport,
     RetrievalEvalRequest,
     RetrievalEvalResponse,
+    RuntimeStatusResponse,
     SearchHit,
     SearchRequest,
     TaskResponse,
@@ -28,6 +29,7 @@ from app.services.llm import AnswerGenerator, build_answer_generator
 from app.services.ops import KnowledgeOpsService
 from app.services.qa import AnswerAgent
 from app.services.retrieval import HybridRetrievalService, hit_snippet
+from app.services.runtime import RuntimeStatusService
 from app.services.security import SecurityValidationError
 from app.services.storage import KnowledgeStore
 from app.services.tasks import TaskService
@@ -72,6 +74,11 @@ def get_retrieval(
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "knowledgeops-agent"}
+
+
+@router.get("/runtime/status", response_model=RuntimeStatusResponse)
+def runtime_status(store: KnowledgeStore = Depends(get_store)):
+    return RuntimeStatusService(get_settings(), store).build_status()
 
 
 @router.post("/documents/text", response_model=DocumentResponse)

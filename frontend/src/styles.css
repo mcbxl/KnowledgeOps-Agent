@@ -483,7 +483,7 @@ button.documentRow.selected {
   }
 
   .nav {
-    grid-template-columns: repeat(8, minmax(0, 1fr));
+    grid-template-columns: repeat(9, minmax(0, 1fr));
   }
 
   .nav button {
@@ -622,4 +622,75 @@ button.documentRow.selected {
   border-radius: 999px;
   font-size: 12px;
   padding: 4px 9px;
+}
+
+.runtimeMetrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+}
+
+.runtimeList,
+.recommendationList {
+  display: grid;
+  gap: 10px;
+}
+
+.runtimeComponent {
+  border: 1px solid #e0e5ea;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.runtimeComponent.ok {
+  border-left: 3px solid #168466;
+}
+
+.runtimeComponent.degraded {
+  border-left: 3px solid #b7791f;
+}
+
+.runtimeComponent.action_required {
+  border-left: 3px solid #b42318;
+}
+
+.runtimeComponent div,
+.runtimeComponent footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.runtimeComponent span,
+.runtimeComponent small {
+  color: #617082;
+}
+
+.runtimeComponent p {
+  color: #3d4856;
+  line-height: 1.5;
+}
+
+.runtimeComponent footer span {
+  background: #f0f3f6;
+  border-radius: 999px;
+  color: #445366;
+  font-size: 12px;
+  padding: 4px 9px;
+}
+
+.recommendation {
+  background: #f8fafc;
+  border: 1px solid #e0e5ea;
+  border-radius: 8px;
+  color: #3d4856;
+  line-height: 1.45;
+  padding: 12px;
+}
+
+@media (max-width: 900px) {
+  .runtimeMetrics {
+    grid-template-columns: 1fr;
+  }
 }

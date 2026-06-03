@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import ReactFlow, { Background, Controls } from 'reactflow'
 import {
   AlertTriangle,
+  Activity,
   BookOpen,
   Boxes,
   ClipboardCheck,
@@ -20,6 +21,7 @@ import {
   evaluateRetrieval,
   getDocument,
   getOpsReport,
+  getRuntimeStatus,
   ingestText,
   ingestUrl,
   createOpsReportTask,
@@ -36,6 +38,7 @@ const tabs = [
   { id: 'ask', label: 'Ask', icon: MessageSquareText },
   { id: 'ops', label: 'Ops', icon: Sparkles },
   { id: 'agent', label: 'Agent', icon: ClipboardCheck },
+  { id: 'runtime', label: 'Runtime', icon: Activity },
   { id: 'eval', label: 'Eval', icon: Gauge },
   { id: 'tasks', label: 'Tasks', icon: ListChecks },
   { id: 'graph', label: 'Graph', icon: GitBranch },
@@ -124,6 +127,7 @@ export default function App() {
         {activeTab === 'ask' && <AskPanel />}
         {activeTab === 'ops' && <OpsPanel report={report} refresh={refresh} />}
         {activeTab === 'agent' && <AgentPanel />}
+        {activeTab === 'runtime' && <RuntimePanel />}
         {activeTab === 'eval' && <EvalPanel />}
         {activeTab === 'tasks' && <TasksPanel />}
         {activeTab === 'graph' && <GraphPanel report={report} />}
@@ -456,6 +460,94 @@ function AgentPanel() {
         ) : (
           <p className="empty">Run the agent to generate a governance workflow.</p>
         )}
+      </div>
+    </section>
+  )
+}
+
+function RuntimePanel() {
+  const [runtime, setRuntime] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [status, setStatus] = useState('')
+
+  async function refresh() {
+    setLoading(true)
+    setStatus('')
+    try {
+      setRuntime(await getRuntimeStatus())
+    } catch (error) {
+      setStatus(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    refresh()
+  }, [])
+
+  return (
+    <section className="stack">
+      <div className="metrics runtimeMetrics">
+        <Metric label="Environment" value={runtime?.environment || '...'} />
+        <Metric label="Runtime" value={runtime?.status || 'loading'} />
+        <Metric label="Components" value={runtime?.components?.length ?? 0} />
+        <button className="primary" onClick={refresh} type="button">
+          {loading ? <Loader2 className="spin" size={17} /> : <Activity size={17} />}
+          Refresh
+        </button>
+      </div>
+
+      {status && <div className="status">{status}</div>}
+
+      <div className="grid two">
+        <div className="panel">
+          <div className="panelHeader">
+            <Activity size={18} />
+            <h2>Runtime Components</h2>
+          </div>
+          {!runtime ? (
+            <p className="empty">Loading runtime status...</p>
+          ) : (
+            <div className="runtimeList">
+              {runtime.components.map((component) => (
+                <article className={`runtimeComponent ${component.status}`} key={component.name}>
+                  <div>
+                    <strong>{component.name}</strong>
+                    <span>{component.status}</span>
+                  </div>
+                  <small>{component.provider || 'not configured'}</small>
+                  <p>{component.detail}</p>
+                  {component.checks.length > 0 && (
+                    <footer>
+                      {component.checks.map((check) => (
+                        <span key={check}>{check}</span>
+                      ))}
+                    </footer>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="panel">
+          <div className="panelHeader">
+            <ClipboardCheck size={18} />
+            <h2>Readiness Recommendations</h2>
+          </div>
+          {!runtime ? (
+            <p className="empty">Runtime checks will appear here.</p>
+          ) : (
+            <div className="recommendationList">
+              {runtime.recommendations.map((item) => (
+                <article className="recommendation" key={item}>
+                  <span>{item}</span>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </section>
   )
