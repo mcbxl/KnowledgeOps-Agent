@@ -1,5 +1,13 @@
 # KnowledgeOps Agent
 
+## Project Guide
+
+- [Architecture](docs/architecture.md)
+- [Demo Script](docs/demo-script.md)
+- [Deployment Guide](docs/deployment.md)
+- [Resume Description](docs/resume.md)
+- [Completion Notes](docs/completion.md)
+
 个人知识库运营与推理 Agent。它不是只做“上传文档然后问答”的 RAG Demo，而是围绕知识资产生命周期构建：多源接入、层级化 chunking、真实 Embedding/LLM 接入、Qdrant 向量索引、Hybrid Search、引用溯源问答、质量诊断、冲突检测、Topic Coverage、检索评测和 LangGraph 治理工作流。
 
 ## 核心能力
