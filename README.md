@@ -10,6 +10,7 @@
 - Qdrant 向量数据库：文档入库时同步 upsert chunk vectors，检索时参与 hybrid scoring。
 - Hybrid Search：融合 BM25 风格关键词召回、向量召回和 rerank 分数。
 - LLM 答案生成：默认本地引用答案生成器；生产可切换 LangChain `ChatOpenAI`，只基于召回上下文回答。
+- Grounding Audit：对答案和引用片段做轻量 faithful 检查，返回 groundedness、evidence coverage、unsupported terms 和风险提示。
 - LangGraph Agent：使用 `StateGraph` 编排资产盘点、质量诊断、冲突检测、检索探测和治理计划。
 - Runtime Readiness：检查 MySQL/SQLite、Embedding、LLM、Qdrant、安全配置的生产就绪状态。
 - 生产安全：URL SSRF 风险拦截、上传大小/扩展名限制、环境变量配置 CORS 和模型密钥。
@@ -93,7 +94,7 @@ http://127.0.0.1:5173
 - `GET /api/documents`：查看文档列表
 - `GET /api/documents/{document_id}`：查看文档详情和 chunk 结构
 - `POST /api/search`：Hybrid Search 检索
-- `POST /api/ask`：引用溯源问答
+- `POST /api/ask`：引用溯源问答，并返回 Grounding Audit
 - `GET /api/ops/report`：生成知识库运营报告
 - `POST /api/agent/run`：运行 LangGraph KnowledgeOps Agent
 - `GET /api/runtime/status`：查看模型、向量库、数据库和安全配置的运行状态
@@ -109,4 +110,4 @@ python -m pytest
 python -m ruff check .
 ```
 
-当前测试覆盖导入、检索、问答、LangGraph Agent、检索评测、任务中心、Runtime Readiness、安全校验和向量索引融合路径。
+当前测试覆盖导入、检索、问答、Grounding Audit、LangGraph Agent、检索评测、任务中心、Runtime Readiness、安全校验和向量索引融合路径。

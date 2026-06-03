@@ -5,7 +5,9 @@ from app.api import routes
 from app.core.config import Settings
 from app.main import app
 from app.models.domain import Chunk, Document
+from app.schemas.api import Citation
 from app.services.embedding import DeterministicEmbeddingService
+from app.services.grounding import GroundingAuditor
 from app.services.llm import LocalCitationAnswerGenerator
 from app.services.retrieval import HybridRetrievalService, RetrievalHit
 from app.services.security import SecurityValidationError, validate_public_http_url, validate_upload
@@ -79,6 +81,23 @@ def test_local_answer_generator_is_grounded():
 
     assert "RAG Note" in answer
     assert "retrieved context" in answer
+
+
+def test_grounding_auditor_scores_supported_answers():
+    citation = Citation(
+        document_id="doc-1",
+        chunk_id="chunk-1",
+        title="React 18",
+        section_path=["React"],
+        snippet="React 18 recommends createRoot for new roots.",
+        score=0.9,
+    )
+
+    grounding = GroundingAuditor().audit("React 18 recommends createRoot.", [citation])
+
+    assert grounding.status in {"grounded", "weak"}
+    assert grounding.groundedness_score > 0.5
+    assert grounding.citation_count == 1
 
 
 def test_retrieval_uses_vector_index_scores(tmp_path):

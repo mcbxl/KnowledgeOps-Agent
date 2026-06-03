@@ -301,8 +301,10 @@ function AskPanel() {
             <div className="answerMeta">
               <span>Intent: {result.detected_intent}</span>
               <span>Confidence: {Math.round(result.confidence * 100)}%</span>
+              {result.grounding && <span>Grounding: {result.grounding.status}</span>}
             </div>
             <pre>{result.answer}</pre>
+            {result.grounding && <GroundingAudit grounding={result.grounding} />}
             <h3>Citations</h3>
             <CitationList citations={result.citations} />
           </>
@@ -311,6 +313,35 @@ function AskPanel() {
         )}
       </div>
     </section>
+  )
+}
+
+function GroundingAudit({ grounding }) {
+  return (
+    <div className={`groundingAudit ${grounding.status}`}>
+      <div>
+        <strong>{Math.round(grounding.groundedness_score * 100)}%</strong>
+        <span>Groundedness</span>
+      </div>
+      <div>
+        <strong>{Math.round(grounding.evidence_coverage * 100)}%</strong>
+        <span>Evidence coverage</span>
+      </div>
+      <div>
+        <strong>{grounding.citation_count}</strong>
+        <span>Citations</span>
+      </div>
+      {grounding.unsupported_terms.length > 0 && (
+        <p>Unsupported terms: {grounding.unsupported_terms.slice(0, 8).join(', ')}</p>
+      )}
+      {grounding.warnings.length > 0 && (
+        <ul>
+          {grounding.warnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 

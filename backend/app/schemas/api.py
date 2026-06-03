@@ -79,11 +79,21 @@ class AskRequest(SearchRequest):
     answer_mode: Literal["knowledge_only", "draft_with_gaps"] = "knowledge_only"
 
 
+class AnswerGrounding(BaseModel):
+    status: Literal["grounded", "weak", "unsupported"]
+    groundedness_score: float
+    evidence_coverage: float
+    citation_count: int
+    unsupported_terms: list[str] = []
+    warnings: list[str] = []
+
+
 class AskResponse(BaseModel):
     answer: str
     citations: list[Citation]
     detected_intent: str
     confidence: float
+    grounding: AnswerGrounding | None = None
 
 
 class QualityIssue(BaseModel):

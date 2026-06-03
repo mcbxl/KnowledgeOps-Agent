@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.schemas.api import AskResponse, Citation
+from app.services.grounding import GroundingAuditor
 from app.services.llm import AnswerGenerator, LocalCitationAnswerGenerator
 from app.services.retrieval import HybridRetrievalService, hit_snippet
 
@@ -10,9 +11,11 @@ class AnswerAgent:
         self,
         retrieval: HybridRetrievalService,
         generator: AnswerGenerator | None = None,
+        auditor: GroundingAuditor | None = None,
     ) -> None:
         self.retrieval = retrieval
         self.generator = generator or LocalCitationAnswerGenerator()
+        self.auditor = auditor or GroundingAuditor()
 
     def answer(
         self,
@@ -39,13 +42,22 @@ class AnswerAgent:
             answer = "知识库中没有找到足够依据回答这个问题。"
             if answer_mode == "draft_with_gaps":
                 answer += " 可以补充相关文档后重新提问。"
-            return AskResponse(answer=answer, citations=[], detected_intent=detected, confidence=0.0)
+            grounding = self.auditor.audit(answer, citations)
+            return AskResponse(
+                answer=answer,
+                citations=[],
+                detected_intent=detected,
+                confidence=0.0,
+                grounding=grounding,
+            )
 
         answer = self.generator.generate(query, hits, detected)
         confidence = min(0.95, sum(hit.score for hit in hits[:3]) / max(min(len(hits), 3), 1))
+        grounding = self.auditor.audit(answer, citations)
         return AskResponse(
             answer=answer,
             citations=citations,
             detected_intent=detected,
             confidence=round(confidence, 4),
+            grounding=grounding,
         )

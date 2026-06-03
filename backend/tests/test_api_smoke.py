@@ -52,6 +52,7 @@ def test_ingest_search_ask_agent_and_eval(tmp_path):
         )
         assert ask.status_code == 200
         assert ask.json()["citations"]
+        assert ask.json()["grounding"]["citation_count"] >= 1
 
         agent = client.post(
             "/api/agent/run",

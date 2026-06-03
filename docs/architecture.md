@@ -26,6 +26,7 @@ FastAPI Backend
   -> Answer Agent
        -> local citation generator
        -> LangChain ChatOpenAI grounded generation
+  -> Grounding Audit
   -> LangGraph KnowledgeOps Agent
   -> Runtime Readiness Service
   -> Evaluation / Task / Ops Services
@@ -79,6 +80,17 @@ KNOWLEDGEOPS_QDRANT_COLLECTION=knowledgeops_chunks
 
 每个阶段输出 `status`、`observation`、`evidence` 和 `next_actions`，方便前端展示和面试演示。
 
+## Grounding Audit
+
+`AnswerAgent` 在生成答案后会调用 `GroundingAuditor`，基于答案词项和 citation snippets 的覆盖关系计算：
+
+- `groundedness_score`：答案词项被引用证据支撑的综合分数。
+- `evidence_coverage`：答案中可审计词项与引用片段的重合比例。
+- `unsupported_terms`：答案中没有被引用片段覆盖的高信息量词项。
+- `warnings`：低覆盖率、引用数量不足等风险提示。
+
+这不是替代 RAGAS 或 LLM-as-judge，而是一个无外部依赖、可在 CI 和本地运行的第一层 faithful guardrail。前端 Ask 面板会直接展示审计结果，便于演示答案不是“只生成”，而是被系统检查。
+
 ## 安全与测试
 
 生产安全边界包括：
@@ -104,6 +116,7 @@ KNOWLEDGEOPS_QDRANT_COLLECTION=knowledgeops_chunks
 
 - API smoke test：导入、检索、问答、Agent、评测、任务中心。
 - Runtime test：检查本地 fallback 状态和生产配置缺失时的 action_required。
+- Grounding test：检查答案和引用证据的覆盖评分。
 - 安全测试：私有 URL、非法扩展名、超大上传拦截。
 - Provider 测试：本地答案生成器可复现、向量索引分数参与 hybrid retrieval。
 

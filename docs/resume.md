@@ -18,6 +18,7 @@ KnowledgeOps Agent：个人知识库运营与推理 Agent
 - 集成 Qdrant 向量数据库，文档入库时同步 upsert chunk 向量，查询时使用 Qdrant TopK 候选与 BM25、rerank 分数融合。
 - 使用 LangGraph StateGraph 编排 Agent 节点，将资产盘点、质量诊断、冲突检测、检索探测和治理计划拆成可观测工作流。
 - 构建引用溯源答案生成链路，LLM 仅基于召回上下文生成回答，并返回文档、章节路径、原文片段和相关度分数。
+- 增加 Grounding Audit 能力，对答案与引用片段做 evidence coverage 检查，输出 groundedness 分数、unsupported terms 和风险提示。
 - 实现层级化 Chunking 策略，结合标题结构、段落语义边界和元数据继承，保留章节路径、来源和标签信息。
 - 使用 SQLAlchemy + MySQL 管理知识库元数据，同时保留 SQLite 注入能力，支持无 MySQL 环境下的自动化测试。
 - 增加生产安全边界：URL 接入拦截 localhost/private IP 等 SSRF 风险目标，上传限制文件大小和扩展名，CORS 来源通过环境变量配置。
@@ -29,7 +30,7 @@ KnowledgeOps Agent：个人知识库运营与推理 Agent
 
 - 导入一篇 Markdown 或网页文档，查看生成的 chunks、章节路径、token 数和 embedding 维度。
 - 在 `/api/search` 中观察 lexical/vector/rerank 三类分数，展示 Hybrid Search 可解释性。
-- 在 `/api/ask` 中展示 LLM 或本地 generator 的引用溯源回答。
+- 在 `/api/ask` 中展示 LLM 或本地 generator 的引用溯源回答和 Grounding Audit。
 - 在 `/api/agent/run` 中运行 LangGraph Agent，查看每个治理阶段的 observation、evidence 和 next actions。
 - 在 `/api/runtime/status` 中展示真实模型、Qdrant、数据库和安全配置的 runtime readiness。
 - 在 `/api/eval/retrieval` 中执行检索评测，展示测试覆盖和质量评估意识。
