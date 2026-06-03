@@ -4,9 +4,10 @@ import math
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from app.models.domain import Chunk, Document
-from app.services.embedding import DeterministicEmbeddingService
+from app.services.embedding import EmbeddingService
 from app.services.storage import KnowledgeStore
 from app.services.text_utils import cosine, normalize_space, tokenize
+from app.services.vector_store import NoopVectorIndex, VectorIndex
 
 
 @dataclass
@@ -20,9 +21,15 @@ class RetrievalHit:
 
 
 class HybridRetrievalService:
-    def __init__(self, store: KnowledgeStore, embedder: DeterministicEmbeddingService) -> None:
+    def __init__(
+        self,
+        store: KnowledgeStore,
+        embedder: EmbeddingService,
+        vector_index: VectorIndex | None = None,
+    ) -> None:
         self.store = store
         self.embedder = embedder
+        self.vector_index = vector_index or NoopVectorIndex()
 
     def search(self, query: str, intent: str = "auto", limit: int = 8) -> list[RetrievalHit]:
         detected_intent = self.detect_intent(query, intent)
@@ -31,11 +38,18 @@ class HybridRetrievalService:
         documents = {doc.id: doc for doc in self.store.list_documents()}
         lexical = self._bm25(query, chunks)
         query_embedding = self.embedder.embed(query)
+        vector_index_scores = {
+            hit.chunk_id: max(0.0, min(1.0, hit.score))
+            for hit in self.vector_index.search(query_embedding, max(limit * 4, 20))
+        }
         hits: list[RetrievalHit] = []
         query_tokens = set(tokenize(query))
 
         for chunk in chunks:
-            vector_score = max(0.0, cosine(query_embedding, chunk.embedding))
+            vector_score = vector_index_scores.get(
+                chunk.id,
+                max(0.0, cosine(query_embedding, chunk.embedding)),
+            )
             lexical_score = lexical.get(chunk.id, 0.0)
             rerank_score = self._rerank(query_tokens, chunk)
             score = (
@@ -122,4 +136,3 @@ def hit_snippet(text: str, max_chars: int = 260) -> str:
     if len(cleaned) <= max_chars:
         return cleaned
     return cleaned[:max_chars].rsplit(" ", 1)[0] + "..."
-

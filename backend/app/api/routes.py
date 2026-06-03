@@ -21,15 +21,18 @@ from app.schemas.api import (
 )
 from app.services.agent import KnowledgeOpsAgent
 from app.services.chunking import HierarchicalChunker
-from app.services.embedding import DeterministicEmbeddingService
+from app.services.embedding import EmbeddingService, build_embedding_service
 from app.services.evaluation import RetrievalEvaluationService
 from app.services.ingestion import IngestionService
+from app.services.llm import AnswerGenerator, build_answer_generator
 from app.services.ops import KnowledgeOpsService
 from app.services.qa import AnswerAgent
 from app.services.retrieval import HybridRetrievalService, hit_snippet
+from app.services.security import SecurityValidationError
 from app.services.storage import KnowledgeStore
 from app.services.tasks import TaskService
 from app.services.text_utils import normalize_space, tokenize
+from app.services.vector_store import VectorIndex, build_vector_index
 
 router = APIRouter(prefix="/api")
 
@@ -38,22 +41,32 @@ def get_store() -> KnowledgeStore:
     return KnowledgeStore(get_settings().database_url)
 
 
-def get_embedder() -> DeterministicEmbeddingService:
-    return DeterministicEmbeddingService()
+def get_embedder() -> EmbeddingService:
+    return build_embedding_service(get_settings())
+
+
+def get_vector_index() -> VectorIndex:
+    return build_vector_index(get_settings())
+
+
+def get_answer_generator() -> AnswerGenerator:
+    return build_answer_generator(get_settings())
 
 
 def get_ingestion(
     store: KnowledgeStore = Depends(get_store),
-    embedder: DeterministicEmbeddingService = Depends(get_embedder),
+    embedder: EmbeddingService = Depends(get_embedder),
+    vector_index: VectorIndex = Depends(get_vector_index),
 ) -> IngestionService:
-    return IngestionService(store, HierarchicalChunker(embedder))
+    return IngestionService(store, HierarchicalChunker(embedder), get_settings(), vector_index)
 
 
 def get_retrieval(
     store: KnowledgeStore = Depends(get_store),
-    embedder: DeterministicEmbeddingService = Depends(get_embedder),
+    embedder: EmbeddingService = Depends(get_embedder),
+    vector_index: VectorIndex = Depends(get_vector_index),
 ) -> HybridRetrievalService:
-    return HybridRetrievalService(store, embedder)
+    return HybridRetrievalService(store, embedder, vector_index)
 
 
 @router.get("/health")
@@ -79,6 +92,8 @@ async def ingest_url(payload: IngestUrlRequest, service: IngestionService = Depe
         raise HTTPException(status_code=403, detail="Web ingestion is disabled.")
     try:
         doc = await service.ingest_url(str(payload.url), payload.tags)
+    except SecurityValidationError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return _document_response(doc, store)
@@ -89,6 +104,8 @@ async def ingest_upload(file: UploadFile = File(...), service: IngestionService 
     raw = await file.read()
     try:
         doc = service.ingest_upload(file.filename or "upload.txt", raw)
+    except SecurityValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return _document_response(doc, store)
@@ -141,8 +158,12 @@ def search(payload: SearchRequest, retrieval: HybridRetrievalService = Depends(g
 
 
 @router.post("/ask", response_model=AskResponse)
-def ask(payload: AskRequest, retrieval: HybridRetrievalService = Depends(get_retrieval)):
-    return AnswerAgent(retrieval).answer(
+def ask(
+    payload: AskRequest,
+    retrieval: HybridRetrievalService = Depends(get_retrieval),
+    generator: AnswerGenerator = Depends(get_answer_generator),
+):
+    return AnswerAgent(retrieval, generator).answer(
         payload.query,
         intent=payload.intent,
         limit=payload.limit,

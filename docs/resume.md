@@ -6,31 +6,28 @@ KnowledgeOps Agent：个人知识库运营与推理 Agent
 
 ## 一句话介绍
 
-基于 RAG 与 LangGraph Agent 工作流构建个人知识库运营系统，支持多源知识接入、层级化切分、Hybrid Search、Rerank、引用溯源问答、知识冲突检测和主动治理报告，使用 MySQL 管理知识库元数据。
+基于 FastAPI、LangGraph、LangChain、MySQL 与 Qdrant 构建个人知识库运营 Agent，支持多源接入、真实 Embedding/LLM 接入、混合检索、引用溯源问答、质量诊断、冲突检测、检索评测与生产级安全校验。
 
 ## 简历描述
 
-设计并实现 KnowledgeOps Agent，一个面向个人/团队知识库的智能运营系统。系统支持 Markdown、网页、文件等多源知识接入，完成文档解析、自动摘要、标签生成、入库去重、层级化 chunking、embedding 向量化、Hybrid Search 检索、rerank 重排序和引用溯源问答。使用 MySQL 存储文档、chunk 和元数据，并基于 LangGraph StateGraph 编排 KnowledgeOps Agent 工作流，实现知识资产盘点、质量诊断、重复内容识别、冲突候选检测、FAQ 生成、学习路径规划和知识图谱构建，将知识库从被动问答工具升级为主动治理系统。
+设计并实现 KnowledgeOps Agent，一个面向个人/团队知识库的智能运营系统。系统支持 Markdown、网页、文件上传等多源知识接入，完成文档解析、自动摘要、标签生成、入库去重、层级化 chunking、Embedding 向量化、Qdrant 向量索引、BM25 风格关键词召回、rerank 重排和引用溯源问答。使用 MySQL 管理文档、chunk、任务和元数据，通过 LangGraph StateGraph 编排 KnowledgeOps Agent 工作流，实现知识资产盘点、质量诊断、冲突候选检测、检索探测和治理计划生成，将知识库从被动问答工具升级为主动治理系统。
 
 ## 技术亮点
 
-- 设计多源文档解析 Pipeline，支持 Markdown、网页和文件上传，自动提取标题、摘要、标签、来源和内容哈希。
-- 使用 SQLAlchemy + MySQL 管理知识库元数据，并保留向量索引和关键词索引的可替换边界。
-- 实现层级化 Chunking 策略，结合标题结构、段落语义边界和元数据继承，保留章节路径、来源和标签信息。
-- 设计文档检查器，支持查看正文预览、内容哈希、chunk 列表、章节路径、Token 数和 embedding 维度，便于验证索引构建质量。
-- 构建 Hybrid Search 检索链路，融合 BM25 风格关键词召回、Embedding 向量召回与 rerank 重排序，提高复杂问题召回准确率。
-- 引入问题意图识别机制，根据事实、概念、总结、对比类问题动态调整关键词、向量和 rerank 权重。
-- 实现引用溯源问答机制，将生成答案与原始文档片段绑定，返回文档名、章节路径、原文片段和相关度分数。
+- 设计 Provider 化模型层，支持本地 deterministic embedding/answer generator 与 LangChain OpenAI Embeddings/ChatOpenAI 的生产切换，保证本地测试稳定、生产可接真实模型。
+- 集成 Qdrant 向量数据库，文档入库时同步 upsert chunk 向量，查询时使用 Qdrant TopK 候选与 BM25、rerank 分数融合。
 - 使用 LangGraph StateGraph 编排 Agent 节点，将资产盘点、质量诊断、冲突检测、检索探测和治理计划拆成可观测工作流。
-- 实现证据化运营报告，为重复、低质量和冲突候选问题输出置信度、触发证据和建议治理动作。
-- 设计 Topic Coverage 分析能力，识别薄弱主题、健康主题和高密度主题，为知识补全和学习路线生成提供依据。
-- 设计运营任务中心，使用任务表记录任务状态、输入参数、执行结果和错误信息，为后续接入 Celery/RQ 异步队列预留工程边界。
-- 自动生成 FAQ、学习路线和知识图谱数据，提升知识库的可维护性和复用价值。
-- 提供检索评估服务，评估 TopK 召回、Top1 相关度和引用元数据完整性，为后续 RAG 质量评估打基础。
+- 构建引用溯源答案生成链路，LLM 仅基于召回上下文生成回答，并返回文档、章节路径、原文片段和相关度分数。
+- 实现层级化 Chunking 策略，结合标题结构、段落语义边界和元数据继承，保留章节路径、来源和标签信息。
+- 使用 SQLAlchemy + MySQL 管理知识库元数据，同时保留 SQLite 注入能力，支持无 MySQL 环境下的自动化测试。
+- 增加生产安全边界：URL 接入拦截 localhost/private IP 等 SSRF 风险目标，上传限制文件大小和扩展名，CORS 来源通过环境变量配置。
+- 提供检索评测服务，评估 TopK 召回、Top1 分数和 citation-ready 比例，为后续 RAGAS/自定义 benchmark 打基础。
+- 为运维任务中心设计任务表，记录任务状态、输入参数、执行结果和错误信息，便于后续替换为 Celery/RQ + Redis。
 
-## 可继续扩展
+## 可演示能力
 
-- 接入 Qdrant 和 Elasticsearch/Meilisearch，实现生产级向量检索和关键词检索。
-- 增加 Alembic migration 管理 MySQL 表结构演进。
-- 接入 bge-reranker、Jina Reranker 或 Cohere Rerank，提高重排质量。
-- 引入 RAGAS 或自定义 benchmark，评估检索召回率、引用覆盖率和答案忠实度。
+- 导入一篇 Markdown 或网页文档，查看生成的 chunks、章节路径、token 数和 embedding 维度。
+- 在 `/api/search` 中观察 lexical/vector/rerank 三类分数，展示 Hybrid Search 可解释性。
+- 在 `/api/ask` 中展示 LLM 或本地 generator 的引用溯源回答。
+- 在 `/api/agent/run` 中运行 LangGraph Agent，查看每个治理阶段的 observation、evidence 和 next actions。
+- 在 `/api/eval/retrieval` 中执行检索评测，展示测试覆盖和质量评估意识。

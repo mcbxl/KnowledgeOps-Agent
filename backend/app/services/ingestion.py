@@ -3,16 +3,27 @@ from __future__ import annotations
 import re
 import httpx
 from bs4 import BeautifulSoup
+from app.core.config import Settings
 from app.models.domain import Document
 from app.services.chunking import HierarchicalChunker
+from app.services.security import validate_public_http_url, validate_upload
 from app.services.storage import KnowledgeStore
 from app.services.text_utils import extract_tags, normalize_space, summarize
+from app.services.vector_store import VectorIndex
 
 
 class IngestionService:
-    def __init__(self, store: KnowledgeStore, chunker: HierarchicalChunker) -> None:
+    def __init__(
+        self,
+        store: KnowledgeStore,
+        chunker: HierarchicalChunker,
+        settings: Settings,
+        vector_index: VectorIndex,
+    ) -> None:
         self.store = store
         self.chunker = chunker
+        self.settings = settings
+        self.vector_index = vector_index
 
     def ingest_text(
         self,
@@ -32,9 +43,13 @@ class IngestionService:
             summary=summarize(content),
         )
         chunks = self.chunker.chunk(document)
-        return self.store.add_document(document, chunks)
+        stored = self.store.add_document(document, chunks)
+        if stored.id == document.id:
+            self.vector_index.upsert_chunks(document, chunks)
+        return stored
 
     async def ingest_url(self, url: str, tags: list[str] | None = None) -> Document:
+        validate_public_http_url(url, self.settings)
         async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
             response = await client.get(url)
             response.raise_for_status()
@@ -51,6 +66,7 @@ class IngestionService:
         return self.ingest_text(title, content, "web", url, tags)
 
     def ingest_upload(self, filename: str, raw: bytes, tags: list[str] | None = None) -> Document:
+        validate_upload(filename, raw, self.settings)
         suffix = filename.lower().rsplit(".", 1)[-1] if "." in filename else "txt"
         if suffix == "pdf":
             content = self._extract_pdf(raw)
@@ -67,4 +83,3 @@ class IngestionService:
         doc = fitz.open(stream=raw, filetype="pdf")
         pages = [f"# Page {page.number + 1}\n\n{page.get_text()}" for page in doc]
         return "\n\n".join(pages)
-

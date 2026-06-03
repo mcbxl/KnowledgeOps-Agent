@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import re
 from app.models.domain import Chunk, Document
-from app.services.embedding import DeterministicEmbeddingService
+from app.services.embedding import EmbeddingService
 from app.services.text_utils import HEADING_RE, normalize_space
 
 
 class HierarchicalChunker:
-    def __init__(self, embedder: DeterministicEmbeddingService, target_chars: int = 1100) -> None:
+    def __init__(self, embedder: EmbeddingService, target_chars: int = 1100) -> None:
         self.embedder = embedder
         self.target_chars = target_chars
 
@@ -92,4 +92,3 @@ class HierarchicalChunker:
         if current:
             pieces.append(current)
         return pieces
-

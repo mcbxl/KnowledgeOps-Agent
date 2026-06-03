@@ -2,137 +2,102 @@
 
 ## 项目定位
 
-KnowledgeOps Agent 面向个人或团队知识库，核心目标不是简单 RAG 问答，而是持续运营知识资产。系统通过文档接入、结构化切分、混合检索、引用问答、冲突检测和治理建议，让知识库具备“自我诊断”和“主动维护”的能力。
+KnowledgeOps Agent 面向个人或团队知识库，目标不是简单 RAG Demo，而是持续运营知识资产。系统通过文档接入、结构化切分、真实模型接入、向量数据库、混合检索、引用问答、冲突检测和治理建议，让知识库具备自我诊断和主动维护能力。
 
 ## 总体架构
 
 ```text
-前端工作台
-  ├─ 文档导入
-  ├─ 文档检查器
-  ├─ 知识库检索
-  ├─ 引用问答
-  ├─ 运营报告
-  ├─ Agent 工作流
-  ├─ 检索评估
-  ├─ 运营任务中心
-  └─ 知识图谱
+Frontend React/Vite
+  -> 文档导入、文档检查器、检索、问答、运营报告、Agent 工作流、检索评测
 
-后端服务
-  ├─ Document Ingestion Service
-  ├─ Chunking & Metadata Pipeline
-  ├─ Embedding Service
-  ├─ Hybrid Retrieval Service
-  ├─ Answer Agent
-  ├─ LangGraph KnowledgeOps Agent
-  ├─ Retrieval Evaluation Service
-  └─ Task Service
+FastAPI Backend
+  -> Ingestion Service
+  -> Hierarchical Chunker
+  -> Embedding Provider
+       -> local deterministic embedding
+       -> LangChain OpenAIEmbeddings
+  -> Vector Index
+       -> local JSON embedding fallback
+       -> Qdrant collection
+  -> Hybrid Retrieval
+       -> BM25-style lexical score
+       -> vector score
+       -> heuristic rerank score
+  -> Answer Agent
+       -> local citation generator
+       -> LangChain ChatOpenAI grounded generation
+  -> LangGraph KnowledgeOps Agent
+  -> Evaluation / Task / Ops Services
 
-存储层
-  ├─ MySQL：文档、chunk、标签、摘要、引用、报告元数据
-  ├─ Qdrant/Milvus：向量索引升级方向
-  └─ Elasticsearch/Meilisearch：关键词索引升级方向
+Storage
+  -> MySQL: documents, chunks, tasks, metadata
+  -> Qdrant: chunk vectors and retrieval payload
 ```
 
-## MySQL 存储设计
+## 模型接入
 
-后端通过 SQLAlchemy 访问 MySQL。核心表包括：
+模型层使用 Provider 模式。默认 `local` provider 使用确定性 embedding 和本地引用答案生成器，保证测试无需 API Key、结果可复现。生产环境可通过环境变量切换：
 
-- `documents`：文档标题、正文、来源类型、来源 URI、标签、摘要、内容哈希、创建时间。
-- `chunks`：chunk 正文、章节路径、顺序、页码、标签、embedding JSON。
-- `tasks`：运营任务类型、状态、输入参数、执行结果、错误信息和更新时间。
+```text
+KNOWLEDGEOPS_EMBEDDING_PROVIDER=openai
+KNOWLEDGEOPS_EMBEDDING_MODEL=text-embedding-3-small
+KNOWLEDGEOPS_LLM_PROVIDER=openai
+KNOWLEDGEOPS_LLM_MODEL=gpt-4o-mini
+OPENAI_API_KEY=...
+```
 
-本地测试仍可注入 SQLite URL，以保证没有 MySQL 服务时也能跑单元测试；生产运行默认使用 `KNOWLEDGEOPS_DATABASE_URL` 指向 MySQL。
+真实模型接入通过 LangChain：
 
-## 文档接入流程
+- `LangChainOpenAIEmbeddingService` 使用 `langchain_openai.OpenAIEmbeddings`
+- `LangChainOpenAIAnswerGenerator` 使用 `langchain_openai.ChatOpenAI`
+- 答案生成系统提示要求只基于召回上下文回答，并输出引用标记
 
-1. 用户导入 Markdown、文本、网页或文件。
-2. 系统提取标题、正文、来源、标签、摘要和内容哈希。
-3. 通过内容哈希进行入库去重。
-4. Chunking Pipeline 按标题层级和段落语义边界切分。
-5. 每个 chunk 绑定文档 ID、章节路径、顺序、标签和 embedding。
-6. chunk 和文档元数据写入 MySQL。
+## 向量数据库集成
 
-## 文档检查器
+系统支持 Qdrant 作为生产级向量索引：
 
-前端提供 Document Inspector，用于展示单篇文档的：
+```text
+KNOWLEDGEOPS_ENABLE_QDRANT=true
+KNOWLEDGEOPS_QDRANT_URL=http://127.0.0.1:6333
+KNOWLEDGEOPS_QDRANT_COLLECTION=knowledgeops_chunks
+```
 
-- 正文预览
-- 内容哈希
-- chunk 列表
-- 每个 chunk 的章节路径
-- Token 数
-- embedding 维度
-- 标签信息
+文档入库时，chunk embedding 写入 MySQL 的同时会同步 upsert 到 Qdrant。检索时，`HybridRetrievalService` 先生成 query embedding，再从 Qdrant 取向量候选分数，并与 BM25 风格关键词分数、rerank 分数融合。
 
-这个功能用于验证层级化切分和元数据绑定是否正确，也方便在面试或演示时展示系统不是简单固定长度切块。
-
-## Hybrid Search 检索链路
-
-检索分为三类分数：
-
-1. **关键词分数**：BM25 风格，用于精确实体、API 名称、版本号、错误码等。
-2. **向量分数**：本地确定性 embedding，用于语义相似和概念类问题。
-3. **Rerank 分数**：结合 query-token 覆盖、章节标题命中和 chunk 长度进行重排。
-
-系统会识别问题意图：
-
-- 事实类：提高关键词权重
-- 概念类：提高向量权重
-- 总结类：扩大语义召回权重
-- 对比类：平衡多来源召回
+未启用 Qdrant 时，系统使用 MySQL/SQLite 中保存的 chunk embedding 进行本地余弦相似度计算，因此开发和测试环境不依赖外部服务。
 
 ## LangGraph Agent 工作流
 
-`KnowledgeOpsAgent` 使用 LangGraph `StateGraph` 编排，每个阶段是一个 graph node，共享 `AgentState`，通过 `compile().invoke()` 执行。
+`KnowledgeOpsAgent` 使用 LangGraph `StateGraph` 编排，每个阶段是一个 graph node，共享 `AgentState`，通过 `compile().invoke()` 执行：
 
-工作流阶段包括：
+1. Asset inventory：统计文档、chunk 和质量分。
+2. Quality diagnosis：识别低质量文档候选。
+3. Conflict detection：识别版本迁移、废弃 API、互斥结论等冲突候选。
+4. Retrieval probe：用主题词检查检索链路健康度。
+5. Governance plan：生成治理动作和 backlog。
 
-1. **Asset inventory**：统计文档数量、chunk 数量、整体质量分。
-2. **Quality diagnosis**：识别低质量文档，如过短、缺少结构化标题、信息密度不足。
-3. **Conflict detection**：识别版本迁移、废弃 API、互斥结论等冲突候选。
-4. **Retrieval probe**：用主题词对检索链路进行快速健康检查。
-5. **Governance plan**：生成下一步运营动作和 backlog。
+每个阶段输出 `status`、`observation`、`evidence` 和 `next_actions`，方便前端展示和面试演示。
 
-每个诊断问题都包含：
+## 安全与测试
 
-- `kind`：问题类型，如重复、低质量、冲突候选。
-- `severity`：严重程度。
-- `confidence`：启发式置信度。
-- `evidence`：触发判断的证据。
-- `suggested_actions`：建议采取的治理动作。
+生产安全边界包括：
 
-## Topic Coverage 设计
+- URL 接入只允许 `http/https`，默认拦截 localhost、loopback、private IP、link-local、reserved IP，降低 SSRF 风险。
+- 文件上传限制最大字节数和扩展名，默认仅允许 `txt/md/markdown/pdf`。
+- CORS 来源通过 `KNOWLEDGEOPS_CORS_ORIGINS` 配置，避免硬编码生产域名。
+- 模型 API Key 只通过环境变量读取，不写入代码或响应。
 
-Topic Coverage 用文档标签和 chunk 标签统计主题覆盖：
+测试覆盖包括：
 
-- `thin`：主题内容过薄，可能只有少量文档或 chunk。
-- `healthy`：主题覆盖适中，适合生成 FAQ 或学习路线。
-- `dense`：主题内容密集，适合做专题总结、对比分析或知识图谱扩展。
+- API smoke test：导入、检索、问答、Agent、评测、任务中心。
+- 安全测试：私有 URL、非法扩展名、超大上传拦截。
+- Provider 测试：本地答案生成器可复现、向量索引分数参与 hybrid retrieval。
 
-## 知识图谱设计
+运行：
 
-当前图谱包含三类节点：
-
-- `document`：知识来源文档。
-- `section`：文档中的章节节点。
-- `topic`：由标签和关键词生成的主题节点。
-
-边类型包括：
-
-- `tagged_as`：文档属于某个主题。
-- `has_section`：文档包含某个章节。
-- `mentions`：章节提到某个主题。
-
-生产版本可以继续加入实体节点、概念节点、引用关系和冲突关系。
-
-## 任务中心设计
-
-当前版本提供轻量任务中心，用 MySQL `tasks` 表记录任务状态：
-
-- `queued`
-- `running`
-- `completed`
-- `failed`
-
-`POST /api/tasks/ops-report` 会创建 KnowledgeOps 报告任务，并通过 FastAPI `BackgroundTasks` 在后台执行。该设计是 Celery/RQ 的前置抽象，后续可以将执行器替换为 Redis 队列，而不改变前端和 API 协议。
+```powershell
+cd backend
+python -m pip install -e .[dev]
+python -m pytest
+python -m ruff check .
+```

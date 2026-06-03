@@ -1,14 +1,26 @@
 from __future__ import annotations
 
 from app.schemas.api import AskResponse, Citation
+from app.services.llm import AnswerGenerator, LocalCitationAnswerGenerator
 from app.services.retrieval import HybridRetrievalService, hit_snippet
 
 
 class AnswerAgent:
-    def __init__(self, retrieval: HybridRetrievalService) -> None:
+    def __init__(
+        self,
+        retrieval: HybridRetrievalService,
+        generator: AnswerGenerator | None = None,
+    ) -> None:
         self.retrieval = retrieval
+        self.generator = generator or LocalCitationAnswerGenerator()
 
-    def answer(self, query: str, intent: str = "auto", limit: int = 8, answer_mode: str = "knowledge_only") -> AskResponse:
+    def answer(
+        self,
+        query: str,
+        intent: str = "auto",
+        limit: int = 8,
+        answer_mode: str = "knowledge_only",
+    ) -> AskResponse:
         detected = self.retrieval.detect_intent(query, intent)
         hits = self.retrieval.search(query, detected, limit)
         citations = [
@@ -29,16 +41,7 @@ class AnswerAgent:
                 answer += " 可以补充相关文档后重新提问。"
             return AskResponse(answer=answer, citations=[], detected_intent=detected, confidence=0.0)
 
-        bullets = []
-        for index, hit in enumerate(hits[:4], start=1):
-            path = " > ".join(hit.chunk.section_path)
-            bullets.append(f"{index}. 根据《{hit.document.title}》的 {path}：{hit_snippet(hit.chunk.text, 220)}")
-        answer = "我只根据当前知识库检索到的片段回答：\n\n" + "\n".join(bullets)
-        if detected == "compare":
-            answer += "\n\n这些片段来自不同来源或章节，适合作为对比分析的证据集合。"
-        elif detected == "summary":
-            answer += "\n\n这是基于高相关片段的摘要，建议继续查看引用以确认完整上下文。"
-
+        answer = self.generator.generate(query, hits, detected)
         confidence = min(0.95, sum(hit.score for hit in hits[:3]) / max(min(len(hits), 3), 1))
         return AskResponse(
             answer=answer,
@@ -46,4 +49,3 @@ class AnswerAgent:
             detected_intent=detected,
             confidence=round(confidence, 4),
         )
-
