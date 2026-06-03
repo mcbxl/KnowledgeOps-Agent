@@ -606,8 +606,31 @@ button.documentRow.selected {
 }
 
 .evalMetrics {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-bottom: 10px;
+}
+
+.benchmarkList {
+  display: grid;
+  gap: 10px;
+}
+
+.benchmarkRow {
+  border: 1px solid #e0e5ea;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 12px;
+}
+
+.benchmarkRow div {
+  display: grid;
+  gap: 4px;
+}
+
+.benchmarkRow span {
+  color: #617082;
 }
 
 .taskToolbar {
@@ -743,6 +766,11 @@ button.documentRow.selected {
   }
 
   .groundingAudit {
+    grid-template-columns: 1fr;
+  }
+
+  .evalMetrics,
+  .benchmarkRow {
     grid-template-columns: 1fr;
   }
 }

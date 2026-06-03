@@ -91,6 +91,24 @@ export function evaluateRetrieval(payload) {
   })
 }
 
+export function createBenchmark(payload) {
+  return request('/eval/benchmarks', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function listBenchmarks(limit = 30) {
+  return request(`/eval/benchmarks?limit=${limit}`)
+}
+
+export function runBenchmark(benchmarkId) {
+  return request(`/eval/benchmarks/${benchmarkId}/run`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+}
+
 export function listTasks(limit = 30) {
   return request(`/tasks?limit=${limit}`)
 }

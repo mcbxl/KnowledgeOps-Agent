@@ -66,6 +66,17 @@ tasks_table = Table(
     Column("updated_at", String(64), nullable=False),
 )
 
+benchmarks_table = Table(
+    "retrieval_benchmarks",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("name", String(160), nullable=False, index=True),
+    Column("cases", Text, nullable=False),
+    Column("limit", Integer, nullable=False),
+    Column("created_at", String(64), nullable=False),
+    Column("updated_at", String(64), nullable=False),
+)
+
 
 class KnowledgeStore:
     """SQLAlchemy-backed metadata store.
@@ -204,6 +215,32 @@ class KnowledgeStore:
             rows = conn.execute(statement).mappings().all()
         return [self._row_to_task(row) for row in rows]
 
+    def create_benchmark(self, name: str, cases: list[dict], limit: int = 5) -> dict:
+        now = datetime.now(timezone.utc).isoformat()
+        benchmark = {
+            "id": str(uuid4()),
+            "name": name,
+            "cases": json.dumps(cases, ensure_ascii=False),
+            "limit": limit,
+            "created_at": now,
+            "updated_at": now,
+        }
+        with self.engine.begin() as conn:
+            conn.execute(benchmarks_table.insert().values(**benchmark))
+        return self._row_to_benchmark(benchmark)
+
+    def list_benchmarks(self, limit: int = 30) -> list[dict]:
+        statement = select(benchmarks_table).order_by(benchmarks_table.c.updated_at.desc()).limit(limit)
+        with self.engine.connect() as conn:
+            rows = conn.execute(statement).mappings().all()
+        return [self._row_to_benchmark(row) for row in rows]
+
+    def get_benchmark(self, benchmark_id: str) -> dict | None:
+        statement = select(benchmarks_table).where(benchmarks_table.c.id == benchmark_id).limit(1)
+        with self.engine.connect() as conn:
+            row = conn.execute(statement).mappings().first()
+        return self._row_to_benchmark(row) if row else None
+
     def _row_to_document(self, row: RowMapping) -> Document:
         return Document(
             id=row["id"],
@@ -238,6 +275,16 @@ class KnowledgeStore:
             "payload": json.loads(row["payload"] or "{}"),
             "result": json.loads(row["result"]) if row["result"] else None,
             "error": row["error"],
+            "created_at": datetime.fromisoformat(row["created_at"]),
+            "updated_at": datetime.fromisoformat(row["updated_at"]),
+        }
+
+    def _row_to_benchmark(self, row) -> dict:
+        return {
+            "id": row["id"],
+            "name": row["name"],
+            "cases": json.loads(row["cases"] or "[]"),
+            "limit": row["limit"],
             "created_at": datetime.fromisoformat(row["created_at"]),
             "updated_at": datetime.fromisoformat(row["updated_at"]),
         }

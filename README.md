@@ -12,6 +12,7 @@
 - LLM 答案生成：默认本地引用答案生成器；生产可切换 LangChain `ChatOpenAI`，只基于召回上下文回答。
 - Grounding Audit：对答案和引用片段做轻量 faithful 检查，返回 groundedness、evidence coverage、unsupported terms 和风险提示。
 - LangGraph Agent：使用 `StateGraph` 编排资产盘点、质量诊断、冲突检测、检索探测和治理计划。
+- Retrieval Benchmark：保存检索基准集，重复运行并统计 Top1、citation-ready 和 expected hit rate。
 - Runtime Readiness：检查 MySQL/SQLite、Embedding、LLM、Qdrant、安全配置的生产就绪状态。
 - 生产安全：API Key 鉴权、请求追踪 ID、URL SSRF 风险拦截、上传大小/扩展名限制、环境变量配置 CORS 和模型密钥。
 - 测试覆盖：API smoke、安全校验、本地 LLM fallback、向量索引参与检索。
@@ -100,6 +101,9 @@ http://127.0.0.1:5173
 - `POST /api/agent/run`：运行 LangGraph KnowledgeOps Agent
 - `GET /api/runtime/status`：查看模型、向量库、数据库和安全配置的运行状态
 - `POST /api/eval/retrieval`：执行检索链路评测
+- `POST /api/eval/benchmarks`：保存检索基准集
+- `GET /api/eval/benchmarks`：查看已保存基准集
+- `POST /api/eval/benchmarks/{benchmark_id}/run`：运行指定基准集
 - `POST /api/tasks/ops-report`：创建运营报告任务
 - `GET /api/tasks`：查看任务列表
 
@@ -111,4 +115,4 @@ python -m pytest
 python -m ruff check .
 ```
 
-当前测试覆盖导入、检索、问答、Grounding Audit、LangGraph Agent、检索评测、任务中心、Runtime Readiness、API Key 鉴权、安全校验和向量索引融合路径。
+当前测试覆盖导入、检索、问答、Grounding Audit、LangGraph Agent、检索基准集、任务中心、Runtime Readiness、API Key 鉴权、安全校验和向量索引融合路径。

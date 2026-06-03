@@ -154,12 +154,36 @@ class RetrievalEvalRequest(BaseModel):
     limit: int = Field(default=5, ge=1, le=20)
 
 
+class BenchmarkCase(BaseModel):
+    query: str = Field(min_length=1)
+    expected_document_id: str | None = None
+    expected_chunk_id: str | None = None
+
+
+class CreateBenchmarkRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    cases: list[BenchmarkCase] = Field(min_length=1)
+    limit: int = Field(default=5, ge=1, le=20)
+
+
+class BenchmarkResponse(BaseModel):
+    id: str
+    name: str
+    cases: list[BenchmarkCase]
+    limit: int
+    created_at: datetime
+    updated_at: datetime
+
+
 class RetrievalEvalCase(BaseModel):
     query: str
     hit_count: int
     top_score: float
     citation_ready: bool
     recommendation: str
+    expected_document_id: str | None = None
+    expected_chunk_id: str | None = None
+    expected_hit: bool | None = None
 
 
 class RetrievalEvalResponse(BaseModel):
@@ -167,6 +191,9 @@ class RetrievalEvalResponse(BaseModel):
     average_top_score: float
     citation_ready_rate: float
     cases: list[RetrievalEvalCase]
+    expected_hit_rate: float | None = None
+    benchmark_id: str | None = None
+    benchmark_name: str | None = None
 
 
 class RuntimeComponent(BaseModel):

@@ -29,7 +29,7 @@ FastAPI Backend
   -> Grounding Audit
   -> LangGraph KnowledgeOps Agent
   -> Runtime Readiness Service
-  -> Evaluation / Task / Ops Services
+  -> Evaluation / Benchmark / Task / Ops Services
 
 Storage
   -> MySQL: documents, chunks, tasks, metadata
@@ -115,11 +115,22 @@ KNOWLEDGEOPS_QDRANT_COLLECTION=knowledgeops_chunks
 
 前端 Runtime 面板会展示每个组件的 `ok`、`degraded`、`action_required` 状态和推荐动作，方便面试演示“不是只会调用模型，而是知道生产系统怎么自检”。
 
+## Retrieval Benchmark
+
+临时评测接口适合快速试探检索质量，但生产 RAG 需要可重复的基准集。系统提供：
+
+- `POST /api/eval/benchmarks`：保存基准集名称、TopK limit 和 query cases。
+- `GET /api/eval/benchmarks`：列出已保存基准集。
+- `POST /api/eval/benchmarks/{benchmark_id}/run`：重复运行指定基准集。
+
+每个 case 可以只包含 query，也可以附加 `expected_document_id` 或 `expected_chunk_id`。运行时会输出 `expected_hit_rate`，用于观察 embedding、chunking、rerank 或 prompt 调整是否造成检索回归。前端 Eval 面板支持保存当前查询为 benchmark，并一键运行历史 benchmark。
+
 测试覆盖包括：
 
 - API smoke test：导入、检索、问答、Agent、评测、任务中心。
 - Runtime test：检查本地 fallback 状态和生产配置缺失时的 action_required。
 - Grounding test：检查答案和引用证据的覆盖评分。
+- Benchmark test：检查保存、列表和运行基准集，以及 expected hit rate。
 - API security test：检查 request id 响应头、API Key 拦截和放行路径。
 - 安全测试：私有 URL、非法扩展名、超大上传拦截。
 - Provider 测试：本地答案生成器可复现、向量索引分数参与 hybrid retrieval。

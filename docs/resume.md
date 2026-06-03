@@ -24,6 +24,7 @@ KnowledgeOps Agent：个人知识库运营与推理 Agent
 - 增加生产安全边界：API Key 鉴权、请求追踪 ID、URL 接入拦截 localhost/private IP 等 SSRF 风险目标，上传限制文件大小和扩展名，CORS 来源通过环境变量配置。
 - 实现 Runtime Readiness 自检接口和前端面板，展示数据库、Embedding、LLM、Qdrant 和安全策略的生产就绪状态。
 - 提供检索评测服务，评估 TopK 召回、Top1 分数和 citation-ready 比例，为后续 RAGAS/自定义 benchmark 打基础。
+- 实现可保存 Retrieval Benchmark，支持 expected document/chunk 命中率统计，用于追踪检索回归。
 - 为运维任务中心设计任务表，记录任务状态、输入参数、执行结果和错误信息，便于后续替换为 Celery/RQ + Redis。
 
 ## 可演示能力
@@ -34,3 +35,4 @@ KnowledgeOps Agent：个人知识库运营与推理 Agent
 - 在 `/api/agent/run` 中运行 LangGraph Agent，查看每个治理阶段的 observation、evidence 和 next actions。
 - 在 `/api/runtime/status` 中展示真实模型、Qdrant、数据库和安全配置的 runtime readiness。
 - 在 `/api/eval/retrieval` 中执行检索评测，展示测试覆盖和质量评估意识。
+- 在 Eval 面板中保存并重复运行基准集，展示 RAG 检索质量基线。

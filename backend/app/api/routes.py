@@ -7,7 +7,9 @@ from app.schemas.api import (
     AgentRunResponse,
     AskRequest,
     AskResponse,
+    BenchmarkResponse,
     ChunkResponse,
+    CreateBenchmarkRequest,
     DocumentDetailResponse,
     DocumentResponse,
     IngestTextRequest,
@@ -199,6 +201,33 @@ def evaluate_retrieval(
     retrieval: HybridRetrievalService = Depends(get_retrieval),
 ):
     return RetrievalEvaluationService(store, retrieval).evaluate(payload.queries, payload.limit)
+
+
+@router.post("/eval/benchmarks", response_model=BenchmarkResponse)
+def create_benchmark(payload: CreateBenchmarkRequest, store: KnowledgeStore = Depends(get_store)):
+    benchmark = store.create_benchmark(
+        name=payload.name,
+        cases=[case.model_dump() for case in payload.cases],
+        limit=payload.limit,
+    )
+    return BenchmarkResponse(**benchmark)
+
+
+@router.get("/eval/benchmarks", response_model=list[BenchmarkResponse])
+def list_benchmarks(limit: int = 30, store: KnowledgeStore = Depends(get_store)):
+    return [BenchmarkResponse(**benchmark) for benchmark in store.list_benchmarks(limit)]
+
+
+@router.post("/eval/benchmarks/{benchmark_id}/run", response_model=RetrievalEvalResponse)
+def run_benchmark(
+    benchmark_id: str,
+    store: KnowledgeStore = Depends(get_store),
+    retrieval: HybridRetrievalService = Depends(get_retrieval),
+):
+    benchmark = store.get_benchmark(benchmark_id)
+    if not benchmark:
+        raise HTTPException(status_code=404, detail="Benchmark not found.")
+    return RetrievalEvaluationService(store, retrieval).run_benchmark(benchmark)
 
 
 @router.post("/tasks/ops-report", response_model=TaskResponse)

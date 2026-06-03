@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import {
   ask,
+  createBenchmark,
   evaluateRetrieval,
   getDocument,
   getOpsReport,
@@ -25,9 +26,11 @@ import {
   ingestText,
   ingestUrl,
   createOpsReportTask,
+  listBenchmarks,
   listTasks,
   listDocuments,
   runAgent,
+  runBenchmark,
   search,
   uploadDocument,
 } from './lib/api'
@@ -586,18 +589,65 @@ function RuntimePanel() {
 
 function EvalPanel() {
   const [queries, setQueries] = useState('React createRoot\nHybrid search\nRerank')
+  const [benchmarkName, setBenchmarkName] = useState('Core retrieval baseline')
+  const [benchmarks, setBenchmarks] = useState([])
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [status, setStatus] = useState('')
+
+  async function refreshBenchmarks() {
+    setBenchmarks(await listBenchmarks())
+  }
+
+  useEffect(() => {
+    refreshBenchmarks().catch((error) => setStatus(error.message))
+  }, [])
+
+  function queryList() {
+    return queries
+      .split('\n')
+      .map((query) => query.trim())
+      .filter(Boolean)
+  }
 
   async function submit(event) {
     event.preventDefault()
     setLoading(true)
+    setStatus('')
     try {
-      const queryList = queries
-        .split('\n')
-        .map((query) => query.trim())
-        .filter(Boolean)
-      setResult(await evaluateRetrieval({ queries: queryList, limit: 5 }))
+      setResult(await evaluateRetrieval({ queries: queryList(), limit: 5 }))
+    } catch (error) {
+      setStatus(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function saveBenchmark() {
+    setLoading(true)
+    setStatus('')
+    try {
+      await createBenchmark({
+        name: benchmarkName,
+        limit: 5,
+        cases: queryList().map((query) => ({ query })),
+      })
+      await refreshBenchmarks()
+      setStatus('Benchmark saved.')
+    } catch (error) {
+      setStatus(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function runSavedBenchmark(benchmarkId) {
+    setLoading(true)
+    setStatus('')
+    try {
+      setResult(await runBenchmark(benchmarkId))
+    } catch (error) {
+      setStatus(error.message)
     } finally {
       setLoading(false)
     }
@@ -611,21 +661,36 @@ function EvalPanel() {
           <h2>Retrieval Evaluation</h2>
         </div>
         <label>
+          Benchmark name
+          <input value={benchmarkName} onChange={(event) => setBenchmarkName(event.target.value)} />
+        </label>
+        <label>
           Benchmark queries
           <textarea value={queries} onChange={(event) => setQueries(event.target.value)} />
         </label>
-        <button className="primary" type="submit">
-          {loading ? <Loader2 className="spin" size={17} /> : <Gauge size={17} />}
-          Evaluate
-        </button>
+        <div className="taskActions">
+          <button className="primary" type="submit">
+            {loading ? <Loader2 className="spin" size={17} /> : <Gauge size={17} />}
+            Evaluate
+          </button>
+          <button className="secondary" onClick={saveBenchmark} type="button">
+            Save Benchmark
+          </button>
+        </div>
+        {status && <p className="taskStatus">{status}</p>}
       </form>
 
-      <div className="panel">
+      <div className="stack">
+        <div className="panel">
         {result ? (
           <>
+            {result.benchmark_name && <p className="summary">Benchmark: {result.benchmark_name}</p>}
             <div className="metrics evalMetrics">
               <Metric label="Avg Top Score" value={result.average_top_score} />
               <Metric label="Citation Ready" value={`${Math.round(result.citation_ready_rate * 100)}%`} />
+              {result.expected_hit_rate !== null && result.expected_hit_rate !== undefined && (
+                <Metric label="Expected Hit" value={`${Math.round(result.expected_hit_rate * 100)}%`} />
+              )}
             </div>
             {result.cases.map((item) => (
               <article className="evalCase" key={item.query}>
@@ -638,6 +703,31 @@ function EvalPanel() {
         ) : (
           <p className="empty">Run benchmark queries to inspect retrieval quality.</p>
         )}
+        </div>
+
+        <div className="panel">
+          <div className="panelHeader">
+            <ListChecks size={18} />
+            <h2>Saved Benchmarks</h2>
+          </div>
+          {benchmarks.length === 0 ? (
+            <p className="empty">No saved benchmarks yet.</p>
+          ) : (
+            <div className="benchmarkList">
+              {benchmarks.map((benchmark) => (
+                <article className="benchmarkRow" key={benchmark.id}>
+                  <div>
+                    <strong>{benchmark.name}</strong>
+                    <span>{benchmark.cases.length} cases / top {benchmark.limit}</span>
+                  </div>
+                  <button className="secondary" type="button" onClick={() => runSavedBenchmark(benchmark.id)}>
+                    Run
+                  </button>
+                </article>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </section>
   )

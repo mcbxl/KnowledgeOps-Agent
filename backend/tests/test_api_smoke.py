@@ -68,6 +68,31 @@ def test_ingest_search_ask_agent_and_eval(tmp_path):
         assert evaluation.status_code == 200
         assert evaluation.json()["cases"][0]["hit_count"] >= 1
 
+        benchmark = client.post(
+            "/api/eval/benchmarks",
+            json={
+                "name": "React retrieval baseline",
+                "limit": 3,
+                "cases": [
+                    {
+                        "query": "React createRoot",
+                        "expected_document_id": document_id,
+                    }
+                ],
+            },
+        )
+        assert benchmark.status_code == 200
+        benchmark_id = benchmark.json()["id"]
+
+        benchmarks = client.get("/api/eval/benchmarks")
+        assert benchmarks.status_code == 200
+        assert len(benchmarks.json()) >= 1
+
+        benchmark_run = client.post(f"/api/eval/benchmarks/{benchmark_id}/run")
+        assert benchmark_run.status_code == 200
+        assert benchmark_run.json()["benchmark_id"] == benchmark_id
+        assert benchmark_run.json()["expected_hit_rate"] == 1.0
+
         task = client.post("/api/tasks/ops-report")
         assert task.status_code == 200
         assert task.json()["status"] in {"queued", "completed"}
