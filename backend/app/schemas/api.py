@@ -222,3 +222,12 @@ class TaskResponse(BaseModel):
     error: str | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class TaskEventResponse(BaseModel):
+    id: str
+    task_id: str
+    event_type: str
+    message: str
+    payload: dict
+    created_at: datetime

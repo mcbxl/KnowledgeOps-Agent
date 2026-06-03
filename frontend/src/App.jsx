@@ -27,6 +27,7 @@ import {
   ingestUrl,
   createOpsReportTask,
   listBenchmarks,
+  listTaskEvents,
   listTasks,
   listDocuments,
   runAgent,
@@ -735,6 +736,8 @@ function EvalPanel() {
 
 function TasksPanel() {
   const [tasks, setTasks] = useState([])
+  const [selectedTaskId, setSelectedTaskId] = useState(null)
+  const [taskEvents, setTaskEvents] = useState([])
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
 
@@ -754,6 +757,19 @@ function TasksPanel() {
       const task = await createOpsReportTask()
       setStatus(`Created task ${task.id.slice(0, 8)}.`)
       setTasks(await listTasks())
+    } catch (error) {
+      setStatus(error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function inspectTask(taskId) {
+    setSelectedTaskId(taskId)
+    setLoading(true)
+    setStatus('')
+    try {
+      setTaskEvents(await listTaskEvents(taskId))
     } catch (error) {
       setStatus(error.message)
     } finally {
@@ -804,6 +820,24 @@ function TasksPanel() {
                   </footer>
                 )}
                 {task.error && <p>{task.error}</p>}
+                <button className="secondary" type="button" onClick={() => inspectTask(task.id)}>
+                  {selectedTaskId === task.id ? 'Refresh Timeline' : 'View Timeline'}
+                </button>
+                {selectedTaskId === task.id && (
+                  <div className="taskEvents">
+                    {taskEvents.length === 0 ? (
+                      <span>No events recorded.</span>
+                    ) : (
+                      taskEvents.map((event) => (
+                        <article className="taskEvent" key={event.id}>
+                          <strong>{event.event_type}</strong>
+                          <span>{new Date(event.created_at).toLocaleString()}</span>
+                          <p>{event.message}</p>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                )}
               </article>
             ))}
           </div>

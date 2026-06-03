@@ -25,7 +25,7 @@ KnowledgeOps Agent：个人知识库运营与推理 Agent
 - 实现 Runtime Readiness 自检接口和前端面板，展示数据库、Embedding、LLM、Qdrant 和安全策略的生产就绪状态。
 - 提供检索评测服务，评估 TopK 召回、Top1 分数和 citation-ready 比例，为后续 RAGAS/自定义 benchmark 打基础。
 - 实现可保存 Retrieval Benchmark，支持 expected document/chunk 命中率统计，用于追踪检索回归。
-- 为运维任务中心设计任务表，记录任务状态、输入参数、执行结果和错误信息，便于后续替换为 Celery/RQ + Redis。
+- 为运维任务中心设计任务表和事件表，记录任务状态、输入参数、执行结果、错误信息和执行时间线，便于后续替换为 Celery/RQ + Redis。
 
 ## 可演示能力
 

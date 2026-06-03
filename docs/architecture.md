@@ -125,12 +125,24 @@ KNOWLEDGEOPS_QDRANT_COLLECTION=knowledgeops_chunks
 
 每个 case 可以只包含 query，也可以附加 `expected_document_id` 或 `expected_chunk_id`。运行时会输出 `expected_hit_rate`，用于观察 embedding、chunking、rerank 或 prompt 调整是否造成检索回归。前端 Eval 面板支持保存当前查询为 benchmark，并一键运行历史 benchmark。
 
+## Task Timeline
+
+任务中心通过 `tasks` 表记录任务状态，并通过 `task_events` 表记录执行时间线。当前 FastAPI `BackgroundTasks` 执行器会在以下节点写入事件：
+
+- `queued`：任务创建并进入队列。
+- `started`：后台任务开始执行。
+- `completed`：任务成功写入摘要结果。
+- `failed`：任务失败并保存错误信息。
+
+`GET /api/tasks/{task_id}/events` 可以读取任务事件历史。这个设计让本地轻量任务中心具备可观测性，也为后续替换 Celery/RQ + Redis 保留 API 和数据结构边界。
+
 测试覆盖包括：
 
 - API smoke test：导入、检索、问答、Agent、评测、任务中心。
 - Runtime test：检查本地 fallback 状态和生产配置缺失时的 action_required。
 - Grounding test：检查答案和引用证据的覆盖评分。
 - Benchmark test：检查保存、列表和运行基准集，以及 expected hit rate。
+- Task event test：检查任务创建、运行和事件历史查询。
 - API security test：检查 request id 响应头、API Key 拦截和放行路径。
 - 安全测试：私有 URL、非法扩展名、超大上传拦截。
 - Provider 测试：本地答案生成器可复现、向量索引分数参与 hybrid retrieval。

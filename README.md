@@ -14,6 +14,7 @@
 - LangGraph Agent：使用 `StateGraph` 编排资产盘点、质量诊断、冲突检测、检索探测和治理计划。
 - Retrieval Benchmark：保存检索基准集，重复运行并统计 Top1、citation-ready 和 expected hit rate。
 - Runtime Readiness：检查 MySQL/SQLite、Embedding、LLM、Qdrant、安全配置的生产就绪状态。
+- Task Timeline：任务中心记录 queued、started、completed、failed 等事件，前端可查看执行历史。
 - 生产安全：API Key 鉴权、请求追踪 ID、URL SSRF 风险拦截、上传大小/扩展名限制、环境变量配置 CORS 和模型密钥。
 - 测试覆盖：API smoke、安全校验、本地 LLM fallback、向量索引参与检索。
 
@@ -106,6 +107,7 @@ http://127.0.0.1:5173
 - `POST /api/eval/benchmarks/{benchmark_id}/run`：运行指定基准集
 - `POST /api/tasks/ops-report`：创建运营报告任务
 - `GET /api/tasks`：查看任务列表
+- `GET /api/tasks/{task_id}/events`：查看任务事件时间线
 
 ## 验证
 
@@ -115,4 +117,4 @@ python -m pytest
 python -m ruff check .
 ```
 
-当前测试覆盖导入、检索、问答、Grounding Audit、LangGraph Agent、检索基准集、任务中心、Runtime Readiness、API Key 鉴权、安全校验和向量索引融合路径。
+当前测试覆盖导入、检索、问答、Grounding Audit、LangGraph Agent、检索基准集、任务中心和事件历史、Runtime Readiness、API Key 鉴权、安全校验和向量索引融合路径。

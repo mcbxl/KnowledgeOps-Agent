@@ -96,9 +96,16 @@ def test_ingest_search_ask_agent_and_eval(tmp_path):
         task = client.post("/api/tasks/ops-report")
         assert task.status_code == 200
         assert task.json()["status"] in {"queued", "completed"}
+        task_id = task.json()["id"]
 
         tasks = client.get("/api/tasks")
         assert tasks.status_code == 200
         assert len(tasks.json()) >= 1
+
+        events = client.get(f"/api/tasks/{task_id}/events")
+        assert events.status_code == 200
+        event_types = {event["event_type"] for event in events.json()}
+        assert "queued" in event_types
+        assert event_types & {"completed", "started"}
     finally:
         app.dependency_overrides.clear()

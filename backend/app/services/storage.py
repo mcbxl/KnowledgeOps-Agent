@@ -66,6 +66,17 @@ tasks_table = Table(
     Column("updated_at", String(64), nullable=False),
 )
 
+task_events_table = Table(
+    "task_events",
+    metadata,
+    Column("id", String(64), primary_key=True),
+    Column("task_id", String(64), ForeignKey("tasks.id"), nullable=False, index=True),
+    Column("event_type", String(80), nullable=False, index=True),
+    Column("message", String(500), nullable=False),
+    Column("payload", Text, nullable=False),
+    Column("created_at", String(64), nullable=False),
+)
+
 benchmarks_table = Table(
     "retrieval_benchmarks",
     metadata,
@@ -183,6 +194,7 @@ class KnowledgeStore:
         }
         with self.engine.begin() as conn:
             conn.execute(tasks_table.insert().values(**task))
+        self.add_task_event(task["id"], "queued", f"Task queued: {title}", payload or {})
         return self._row_to_task(task)
 
     def update_task(
@@ -214,6 +226,35 @@ class KnowledgeStore:
         with self.engine.connect() as conn:
             rows = conn.execute(statement).mappings().all()
         return [self._row_to_task(row) for row in rows]
+
+    def add_task_event(
+        self,
+        task_id: str,
+        event_type: str,
+        message: str,
+        payload: dict | None = None,
+    ) -> dict:
+        event = {
+            "id": str(uuid4()),
+            "task_id": task_id,
+            "event_type": event_type,
+            "message": message,
+            "payload": json.dumps(payload or {}, ensure_ascii=False),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        with self.engine.begin() as conn:
+            conn.execute(task_events_table.insert().values(**event))
+        return self._row_to_task_event(event)
+
+    def list_task_events(self, task_id: str) -> list[dict]:
+        statement = (
+            select(task_events_table)
+            .where(task_events_table.c.task_id == task_id)
+            .order_by(task_events_table.c.created_at.asc())
+        )
+        with self.engine.connect() as conn:
+            rows = conn.execute(statement).mappings().all()
+        return [self._row_to_task_event(row) for row in rows]
 
     def create_benchmark(self, name: str, cases: list[dict], limit: int = 5) -> dict:
         now = datetime.now(timezone.utc).isoformat()
@@ -287,4 +328,14 @@ class KnowledgeStore:
             "limit": row["limit"],
             "created_at": datetime.fromisoformat(row["created_at"]),
             "updated_at": datetime.fromisoformat(row["updated_at"]),
+        }
+
+    def _row_to_task_event(self, row) -> dict:
+        return {
+            "id": row["id"],
+            "task_id": row["task_id"],
+            "event_type": row["event_type"],
+            "message": row["message"],
+            "payload": json.loads(row["payload"] or "{}"),
+            "created_at": datetime.fromisoformat(row["created_at"]),
         }

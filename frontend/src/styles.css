@@ -695,6 +695,25 @@ button.documentRow.selected {
   padding: 4px 9px;
 }
 
+.taskEvents {
+  border-top: 1px solid #edf0f3;
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.taskEvent {
+  border-left: 3px solid #166f8f;
+  display: grid;
+  gap: 4px;
+  padding-left: 10px;
+}
+
+.taskEvent p {
+  color: #3d4856;
+  line-height: 1.45;
+}
+
 .runtimeMetrics {
   grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
 }

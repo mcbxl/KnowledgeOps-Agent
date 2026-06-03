@@ -20,6 +20,7 @@ from app.schemas.api import (
     RuntimeStatusResponse,
     SearchHit,
     SearchRequest,
+    TaskEventResponse,
     TaskResponse,
 )
 from app.services.agent import KnowledgeOpsAgent
@@ -252,6 +253,13 @@ def get_task(task_id: str, store: KnowledgeStore = Depends(get_store)):
     if not task:
         raise HTTPException(status_code=404, detail="Task not found.")
     return TaskResponse(**task)
+
+
+@router.get("/tasks/{task_id}/events", response_model=list[TaskEventResponse])
+def list_task_events(task_id: str, store: KnowledgeStore = Depends(get_store)):
+    if not store.get_task(task_id):
+        raise HTTPException(status_code=404, detail="Task not found.")
+    return [TaskEventResponse(**event) for event in store.list_task_events(task_id)]
 
 
 def _document_response(doc, store: KnowledgeStore) -> DocumentResponse:

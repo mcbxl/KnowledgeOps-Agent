@@ -113,6 +113,10 @@ export function listTasks(limit = 30) {
   return request(`/tasks?limit=${limit}`)
 }
 
+export function listTaskEvents(taskId) {
+  return request(`/tasks/${taskId}/events`)
+}
+
 export function createOpsReportTask() {
   return request('/tasks/ops-report', {
     method: 'POST',
